@@ -69,6 +69,31 @@ Además, son obligatorios:
 - Ningún PR que modifique el manejo de un evento o endpoint compartido se mergea sin que sus
   contract tests pasen.
 
+#### Rigor de TDD por tipo de tarea
+
+No toda tarea de implementación exige el mismo nivel de rigor TDD. Toda feature de este repo
+DEBE clasificar sus tareas de implementación en uno de estos tres niveles antes de comenzar a
+codear (documentado explícitamente en el `tasks.md` de la feature):
+
+- **🟢 TDD estricto**: lógica pura/determinística, fácil de aislar sin mocks de
+  infraestructura pesada (ej. rate limiting, deduplicación, agregación de estados,
+  resolución de reglas condicionales, validación de contratos). Exige ciclo
+  red-green-refactor completo: test unitario específico → falla → implementación mínima →
+  refactor.
+- **🟡 Test-first de integración**: lógica que envuelve un SDK/proveedor externo (clientes de
+  terceros, generadores de archivos, storage). Se define primero la interfaz/contrato
+  (mock-first) con su test, pero el detalle fino se valida con un test de integración en
+  lugar de exigir TDD unitario puro sobre cada línea.
+- **🔴 Test-first de contrato/orquestación**: consumers de eventos y endpoints que coordinan
+  servicios ya testeados por separado (wiring). Se escribe primero el contract test y/o
+  integration test correspondiente, pero no se exige TDD unitario línea a línea sobre la
+  orquestación en sí.
+
+En los tres niveles el test se escribe **antes** que el código de implementación — lo que
+cambia es la granularidad exigida, nunca si se hace test-first o no. Esta clasificación debe
+mantenerse y aplicarse consistentemente en todas las features futuras de este repo, no solo
+en la primera donde se definió.
+
 ### VI. Simplicidad y aislamiento operativo
 
 Cada módulo (Notificaciones Push/Mail, Reportes Exportables) es desplegable e independiente;
@@ -130,4 +155,4 @@ redefinición unilateral de contratos, exposición no autenticada de endpoints i
 acceso directo de frontends a este repo). La complejidad adicional debe justificarse por
 escrito en el PR correspondiente.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-07 | **Last Amended**: 2026-09-07
+**Version**: 1.1.0 | **Ratified**: 2026-09-07 | **Last Amended**: 2026-09-07

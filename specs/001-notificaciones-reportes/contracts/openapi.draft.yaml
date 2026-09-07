@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Recome-Notificaciones — Endpoints expuestos (DRAFT)
+  version: "0.1.0-draft"
+  description: >
+    Especificación DRAFT de los endpoints REST expuestos por este repo para consumo
+    interno de api-general. Pendiente de ratificación/linkeo formal en el repo api-general
+    (Principio III/IV de la constitution). Autenticación: header X-Internal-Api-Key en
+    todos los endpoints.
+servers:
+  - url: https://notificaciones.internal.recome/api/v1
+paths:
+  /notificaciones/enviar:
+    post:
+      summary: Solicitud síncrona de envío de notificación (User Story 2)
+      operationId: enviarNotificacionSincrona
+      security:
+        - internalApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificacionEnviarRequest'
+      responses:
+        '200':
+          description: Resultado del intento de envío
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificacionEnviarResponse'
+        '401':
+          description: API key ausente o inválida
+        '422':
+          description: Payload inválido contra el schema DRAFT
+
+  /reportes/{reporte_id}/estado:
+    get:
+      summary: Consulta el estado de un reporte (User Story 4)
+      operationId: consultarEstadoReporte
+      security:
+        - internalApiKey: []
+      parameters:
+        - name: reporte_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Estado actual del reporte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReporteEstadoResponse'
+        '404':
+          description: Reporte no encontrado
+
+  /reportes/{reporte_id}/descarga:
+    get:
+      summary: >
+        Genera una signed URL de descarga de MinIO con expiración de 15 minutos.
+        Solo debe ser invocado por api-general luego de validar la propiedad del
+        reporte (FR-014); este repo no reimplementa esa autorización de usuario final.
+      operationId: solicitarDescargaReporte
+      security:
+        - internalApiKey: []
+      parameters:
+        - name: reporte_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Signed URL generada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReporteDescargaResponse'
+        '404':
+          description: Reporte no encontrado o no está en estado ready
+        '409':
+          description: Reporte en estado failed o aún no disponible
+
+components:
+  securitySchemes:
+    internalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-Api-Key
+  schemas:
+    NotificacionEnviarRequest:
+      type: object
+      required: [event_id, tipo_evento, usuario_destino, variables]
+      properties:
+        event_id: { type: string, format: uuid }
+        tipo_evento: { type: string }
+        usuario_destino: { type: string }
+        idioma: { type: string, enum: [es, en] }
+        variables: { type: object, additionalProperties: true }
+        canales_solicitados:
+          type: array
+          items: { type: string, enum: [push, mail] }
+    NotificacionEnviarResponse:
+      type: object
+      required: [event_id, estado_entrega, resultados_por_canal]
+      properties:
+        event_id: { type: string, format: uuid }
+        estado_entrega:
+          type: string
+          description: >
+            Estado agregado del evento derivado de resultados_por_canal (FR-008):
+            enviado (todos ok), parcial (mezcla de resultados), fallido (todos fallidos),
+            descartado_rate_limit (todos descartados por rate limit).
+          enum: [enviado, parcial, fallido, descartado_rate_limit]
+        resultados_por_canal:
+          type: array
+          description: Resultado independiente por canal solicitado (reintento/DLQ por canal, FR-004).
+          items:
+            type: object
+            required: [canal, estado]
+            properties:
+              canal: { type: string, enum: [push, mail] }
+              estado: { type: string, enum: [enviado, fallido, descartado_rate_limit] }
+              idioma_usado:
+                type: string
+                description: Idioma efectivamente usado; puede diferir del solicitado si hubo fallback (FR-002).
+    ReporteEstadoResponse:
+      type: object
+      required: [reporte_id, estado]
+      properties:
+        reporte_id: { type: string, format: uuid }
+        estado:
+          type: string
+          enum: [pending, processing, ready, failed]
+        motivo:
+          type: string
+          description: >
+            Presente solo si estado == failed. Valores conocidos: timeout (definitivo, sin
+            reintento automático, FR-012), dependencia_no_disponible (reintentado
+            automáticamente antes de llegar a failed, FR-012a), tipo_no_soportado,
+            limite_tamano_excedido (definitivo, sin reintento automático, FR-013a).
+    ReporteDescargaResponse:
+      type: object
+      required: [reporte_id, url, expira_en_segundos]
+      properties:
+        reporte_id: { type: string, format: uuid }
+        url: { type: string, format: uri }
+        expira_en_segundos:
+          type: integer
+          example: 900

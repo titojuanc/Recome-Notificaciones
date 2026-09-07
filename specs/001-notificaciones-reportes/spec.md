@@ -10,6 +10,40 @@
 sobre infraestructura RabbitMQ compartida, con almacenamiento de archivos en MinIO expuesto vía
 Nginx" — ambigüedades resueltas por el equipo en `RESPUESTAS_AMBIGUEDADES.md`.
 
+## Clarifications
+
+### Session 2026-09-07
+
+- Q: Cuando una notificación se solicita por ambos canales (push + mail) y uno tiene éxito y
+  el otro falla, ¿cómo se modela el estado de entrega? → A: Se agrega el estado `parcial`;
+  se reintenta **solo el canal que falló** (backoff/DLQ aplican por canal), el canal ya
+  exitoso no se reenvía.
+- Q: ¿El contador de rate limit (FR-007) es único compartido entre canales o independiente
+  por canal? → A: Independiente por canal — push y mail cada uno con su propio contador de
+  20/hora por usuario (no se comparte cupo entre canales).
+- Q: Al cumplirse el timeout de generación de un reporte (FR-012), ¿qué pasa con el proceso
+  de generación en curso? → A: Se cancela activamente (kill) el proceso de generación al
+  cumplirse el timeout, liberando recursos de inmediato; no se deja continuar en background.
+- Q: ¿Los jobs de reporte se reintentan automáticamente antes de marcarse `failed`? → B:
+  Reintento automático con backoff para fallos transitorios (ej.
+  `dependencia_no_disponible`), pero NO para `timeout`, que es siempre definitivo (el
+  timeout ya implica que se agotó el tiempo disponible, incluyendo el de reintentos).
+- Q: Si un `tipo_evento` no tiene template cargado en el idioma solicitado/resuelto (ej. falta
+  `en`, solo existe `es`), ¿qué hace el sistema? → A: Fallback automático al idioma default
+  del sistema (`es`) cuando falta el template del idioma solicitado; se envía igual, sin
+  tratarlo como error, y se loguea que se usó fallback de idioma.
+- Q: Si `api-general` responde que el usuario no tiene ninguna preferencia de idioma
+  registrada (nunca la configuró), ¿qué idioma se usa? → A: Se usa `es` como idioma default
+  del sistema (mismo default que el fallback de template faltante, FR-002).
+- Q: ¿Hay un límite máximo de tamaño (filas/páginas) para el archivo de un reporte? → B: Sí,
+  se define un límite máximo configurable por tipo de reporte; si los datos a exportar lo
+  exceden, el job falla con `motivo: limite_tamano_excedido` (sin truncar el archivo).
+- Q: Si se reciben dos eventos `reporte.generar` con `reporte_id` distintos pero filtros
+  idénticos (mismo usuario, mismo tipo, mismo rango), ¿se deduplica por contenido? → A: No;
+  cada `reporte_id` es completamente independiente y se genera su propio archivo. La única
+  deduplicación existente es por `reporte_id` repetido (ver edge case ya definido); no hay
+  deduplicación por combinación de filtros/contenido en esta iteración.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Recibir una notificación relevante (Push/Mail) (Priority: P1)
@@ -131,11 +165,14 @@ fases y verificar que el estado devuelto coincide con la fase real del job.
   necesita consultar preferencias de opt-out? → Se trata como fallo transitorio: reintento con
   backoff igual que un fallo de proveedor; si se agotan los intentos, va a DLQ.
 - ¿Qué pasa si `api-general` no responde cuando el Módulo de Reportes necesita traer los datos
-  a exportar? → El job de generación falla con `motivo: dependencia_no_disponible` tras
-  agotar reintentos propios, y se publica `reporte.listo` con `estado: error`.
+  a exportar? → Se trata como fallo transitorio (FR-012a): se reintenta con backoff antes de
+  marcar el job; si se agotan los reintentos, el job pasa a `failed` con
+  `motivo: dependencia_no_disponible`, y se publica `reporte.listo` con `estado: error`.
 - ¿Qué pasa si el mismo `reporte_id` recibe dos eventos `reporte.generar`? → Debe tratarse con
   la misma lógica de idempotencia por `event_id` que las notificaciones, para evitar generación
-  duplicada.
+  duplicada. Nótese que esto es distinto de recibir dos `reporte_id` diferentes con filtros
+  idénticos: en ese caso NO hay deduplicación por contenido/filtros — cada `reporte_id` genera
+  su propio archivo de forma independiente (Clarifications, sesión 2026-09-07).
 - ¿Qué pasa si el tipo de reporte o el tipo de notificación solicitado no existe en el
   registro de generadores/templates? → Se rechaza el evento/solicitud sin reintentos, se loguea
   y (para notificaciones) se reporta como no enviado por tipo inválido; (para reportes) se
@@ -152,23 +189,41 @@ fases y verificar que el estado devuelto coincide con la fase real del job.
   SendGrid, detrás de una abstracción `MailProvider`). SMS e in-app quedan fuera de alcance.
 - **FR-002**: El sistema DEBE ser dueño de los templates de notificación, versionados por
   `tipo_evento` + `idioma` (mínimo `es` y `en`). El publicador del evento NUNCA envía texto
-  libre, solo `tipo`, `idioma` (opcional) y variables de reemplazo.
+  libre, solo `tipo`, `idioma` (opcional) y variables de reemplazo. Si el `tipo_evento` no
+  tiene template cargado para el idioma resuelto (FR-009), el sistema DEBE hacer fallback
+  automático al template en `es` (idioma default del sistema) y registrar en el log que se
+  usó fallback de idioma, sin tratarlo como error ni bloquear el envío.
 - **FR-003**: El sistema DEBE consultar la preferencia de opt-out del usuario en `api-general`
   vía REST antes de enviar, cacheando el resultado por 5 minutos.
 - **FR-004**: El sistema DEBE reintentar envíos fallidos por causas transitorias con backoff
   exponencial, hasta un máximo de 5 intentos, antes de enviar el mensaje a la dead-letter
-  queue correspondiente.
+  queue correspondiente. El reintento se aplica **por canal individual**: si una notificación
+  se solicitó por push y mail y solo uno de los dos falla, únicamente el canal fallido
+  reintenta/agota su DLQ; el canal exitoso no se reenvía.
 - **FR-005**: El sistema DEBE garantizar idempotencia de envío usando `event_id` (UUID del
   payload) como clave de deduplicación, con TTL igual a la ventana de reintento de RabbitMQ.
 - **FR-006**: El sistema DEBE exponer un endpoint REST síncrono adicional para solicitudes que
   requieren confirmación inmediata de envío, autenticado con API key interna de servicio.
-- **FR-007**: El sistema DEBE aplicar rate limiting configurable por usuario y canal (default
-  20/hora); al superarse, el envío se descarta y se loguea, sin reintento.
+- **FR-007**: El sistema DEBE aplicar rate limiting configurable por usuario y canal, con
+  contador **independiente por canal** (default 20/hora por canal; ej. hasta 20 push/hora Y
+  hasta 20 mail/hora para el mismo usuario, sin cupo compartido entre canales); al superarse
+  el límite de un canal, el envío por ese canal se descarta y se loguea, sin reintento (los
+  demás canales solicitados no se ven afectados).
 - **FR-008**: El sistema DEBE reportar a `api-general` vía REST el estado de entrega de cada
-  notificación (`enviado` / `fallido` / `descartado_rate_limit`), sin duplicar el log canónico
-  de eventos (que vive en Cassandra, propiedad de `api-general`).
+  notificación, evaluado a nivel de evento como agregación de sus canales, donde cada canal
+  solicitado resuelve independientemente en `enviado` / `fallido` (agotó reintentos) /
+  `descartado_rate_limit`, y el estado agregado del evento es:
+  - `enviado`: todos los canales solicitados resultaron `enviado`.
+  - `parcial`: al menos un canal `enviado` y al menos un canal en cualquier otro resultado
+    (`fallido` o `descartado_rate_limit`).
+  - `fallido`: todos los canales solicitados resultaron `fallido`.
+  - `descartado_rate_limit`: todos los canales solicitados resultaron `descartado_rate_limit`.
+  Sin duplicar el log canónico de eventos (que vive en Cassandra, propiedad de `api-general`).
 - **FR-009**: El sistema DEBE resolver el idioma de la notificación priorizando el `idioma`
-  explícito del payload por sobre la preferencia consultada a `api-general`.
+  explícito del payload por sobre la preferencia consultada a `api-general`; si ninguno de
+  los dos está disponible (el payload no trae `idioma` y `api-general` no tiene preferencia
+  registrada para el usuario), el sistema DEBE usar `es` como idioma default del sistema
+  (mismo default usado en el fallback de template faltante, FR-002).
 
 ### Functional Requirements — Reportes Exportables
 
@@ -179,10 +234,22 @@ fases y verificar que el estado devuelto coincide con la fase real del job.
   (con API key de servicio, paginando si es necesario) a partir de los filtros/IDs recibidos en
   el evento `reporte.generar`; el evento NUNCA trae los datos completos embebidos.
 - **FR-012**: El sistema DEBE aplicar un timeout configurable por tipo de reporte (default 5
-  minutos); al excederse, el job pasa a `failed` con `motivo: timeout` y se publica
-  `reporte.listo` con `estado: error`.
+  minutos); al excederse, DEBE cancelar activamente el proceso de generación en curso
+  (liberando sus recursos de inmediato, sin dejarlo continuar en background), el job pasa a
+  `failed` con `motivo: timeout` de forma **definitiva** (sin reintento automático), y se
+  publica `reporte.listo` con `estado: error`.
+- **FR-012a**: El sistema DEBE reintentar automáticamente, con backoff, los fallos
+  **transitorios** de generación de reporte (ej. `motivo: dependencia_no_disponible`) antes
+  de marcar el job como `failed`. El timeout (FR-012) no es un fallo transitorio y por lo
+  tanto nunca se reintenta automáticamente; requiere que el solicitante encole un nuevo
+  evento `reporte.generar` si desea reintentarlo.
 - **FR-013**: El sistema DEBE aplicar una política de retención configurable por tipo (default
   30 días) sobre los archivos en MinIO, con un job de limpieza periódico que borre lo vencido.
+- **FR-013a**: El sistema DEBE aplicar un límite máximo configurable por tipo de reporte sobre
+  el volumen de datos exportables (ej. cantidad de filas/registros). Si los datos a exportar,
+  según los filtros recibidos, exceden ese límite, el job DEBE fallar de forma **definitiva**
+  (sin reintento automático, igual que `timeout`) con `motivo: limite_tamano_excedido`, sin
+  truncar ni generar un archivo parcial.
 - **FR-014**: El sistema DEBE generar URLs de descarga firmadas de MinIO, on-demand, sin exponer
   URLs públicas permanentes. Nginx no debe quedar expuesto directamente al usuario final; la
   descarga se sirve exclusivamente a través de: frontend → `api-general` (valida propiedad del
@@ -226,8 +293,10 @@ fases y verificar que el estado devuelto coincide con la fase real del job.
 
 - **Notificación (solicitud de envío)**: representa un pedido de envío a un usuario; atributos
   clave: `event_id`, `tipo_evento`, `usuario_destino`, `idioma`, `variables`, `canal(es)`
-  resultantes, y `estado de entrega` (`enviado`/`fallido`/`descartado_rate_limit`). No persiste
-  historial canónico (eso vive en `api-general`); mantiene solo estado operativo de corto plazo.
+  resultantes, y `estado de entrega` agregado (`enviado`/`parcial`/`fallido`/
+  `descartado_rate_limit`). El reintento y el paso a DLQ se gestionan por canal individual
+  (push y mail son independientes entre sí). No persiste historial canónico (eso vive en
+  `api-general`); mantiene solo estado operativo de corto plazo.
 - **Preferencia de notificación (opt-out)**: dato propiedad de `api-general`, consumido vía
   REST y cacheado brevemente por este módulo; no se persiste como fuente de verdad acá.
 - **Reporte**: representa un job de generación de archivo exportable; atributos clave:
@@ -270,4 +339,7 @@ fases y verificar que el estado devuelto coincide con la fase real del job.
   partir de los datos de `api-general` y no son fuente de verdad del sistema.
 - Los reportes son regenerables porque los datos de origen siempre están disponibles vía REST
   en `api-general`; no se asume que el reporte en sí deba sobrevivir a una pérdida de MinIO.
-- [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
+- Este módulo depende de que `api-general` exponga los endpoints REST necesarios (consulta de
+  opt-out, consulta de datos paginados para reportes) con autenticación servicio-a-servicio
+  ya operativa; su ausencia bloquea US1 y US3 respectivamente, pero es responsabilidad de
+  coordinación cross-repo, no de esta spec.
