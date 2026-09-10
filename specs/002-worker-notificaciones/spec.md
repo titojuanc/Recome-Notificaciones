@@ -26,6 +26,10 @@
   esquema mínimo de trabajo (`canal`, `destinatario`, `contenido`, `id_mensaje`) que sirva
   de base para el plan técnico; el contrato final se validará contra el repo puerta de
   entrada.
+- Q: US3 describía "reintento" del worker, contradiciendo FR-007 (que delega todo a
+  RabbitMQ). → A: Reescribir US3 para reflejar el comportamiento real: el worker hace
+  `nack` ante fallo transitorio y deja que RabbitMQ reencole, sin lógica de reintento
+  propia.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -99,28 +103,34 @@ rechazado de forma visible/loggeada.
 
 ---
 
-### User Story 3 - Reintento ante fallo transitorio del proveedor de envío (Priority: P3)
+### User Story 3 - Reencolar mensaje ante fallo transitorio del proveedor de envío (Priority: P3)
 
 Como sistema, cuando el envío de la notificación falla por un problema transitorio del
-proveedor (push o mail), el worker debe reintentar el envío según una política definida
-antes de darlo por fallido definitivamente.
+proveedor (push o mail), el worker debe rechazar el mensaje sin confirmarlo (`nack`),
+dejando que sea RabbitMQ quien lo reencole según la configuración nativa de la cola
+(límite de entregas, TTL, dead-letter exchange) — el worker no implementa lógica de
+reintento propia.
 
 **Why this priority**: Mejora la confiabilidad y reduce notificaciones perdidas por
 fallas temporales de terceros, pero el sistema es funcional (aunque menos robusto) sin
 esto — puede entregarse en una iteración posterior.
 
 **Independent Test**: Se puede probar simulando una falla transitoria del proveedor (mock
-que falla las primeras N veces) y verificando que el worker reintenta y finalmente
-entrega, o agota los reintentos y marca el mensaje como fallido de forma visible.
+que falla las primeras N veces) y verificando que el mensaje es reencolado por RabbitMQ y
+finalmente entregado, o que agota el límite de entregas de la cola y termina en
+dead-letter.
 
 **Acceptance Scenarios**:
 
 1. **Given** un mensaje válido cuyo primer intento de envío falla por un error
-   transitorio, **When** el worker reintenta, **Then** el envío se completa
-   exitosamente en un intento posterior dentro de la política de reintentos.
-2. **Given** un mensaje válido cuyo envío falla repetidamente hasta agotar los
-   reintentos, **When** se agota la política, **Then** el mensaje se marca como fallido
-   (dead-letter o equivalente) de forma trazable.
+   transitorio, **When** el worker detecta el fallo, **Then** hace `nack` sin confirmar
+   el mensaje, y RabbitMQ lo reencola según la configuración de la cola.
+2. **Given** un mensaje reencolado que en un intento posterior se envía exitosamente,
+   **When** el envío se confirma, **Then** el worker hace `ack` y el mensaje no se
+   vuelve a reencolar.
+3. **Given** un mensaje cuyo envío falla repetidamente hasta agotar el límite de
+   entregas configurado en la cola, **When** se agota ese límite, **Then** RabbitMQ lo
+   envía automáticamente a la dead-letter exchange, de forma trazable.
 
 ---
 
