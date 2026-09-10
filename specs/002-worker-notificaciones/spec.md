@@ -14,7 +14,7 @@
 
 - Q: Si el broker reentrega el mismo mensaje dos veces (ej. el worker procesó y envió
   pero se cayó antes del ack), ¿qué comportamiento esperás? → A: El worker debe detectar
-  duplicados (por `id_evento`) y descartar el reenvío sin volver a notificar.
+  duplicados (por `id_mensaje`) y descartar el reenvío sin volver a notificar.
 - Q: Si el destinatario no tiene el canal habilitado (sin mail registrado o sin
   suscripción push), ¿quién valida eso? → A: El worker asume que el emisor del mensaje
   ya validó que el destinatario tiene el canal habilitado; el worker solo intenta enviar
@@ -23,7 +23,7 @@
   reintento al mecanismo nativo de RabbitMQ (requeue con límite de entregas/TTL +
   dead-letter exchange), sin lógica de reintento explícita en el código del worker.
 - Q: ¿Qué nivel de detalle del schema del mensaje fijar para esta spec? → B: Fijar un
-  esquema mínimo de trabajo (`canal`, `destinatario`, `contenido`, `id_evento`) que sirva
+  esquema mínimo de trabajo (`canal`, `destinatario`, `contenido`, `id_mensaje`) que sirva
   de base para el plan técnico; el contrato final se validará contra el repo puerta de
   entrada.
 
@@ -66,7 +66,7 @@ canal correcto (usando un proveedor real o un mock/stub del proveedor).
    el mensaje.
 3. **Given** un mensaje válido que fue procesado exitosamente, **When** el envío se
    confirma, **Then** el mensaje se acusa recibo (ack) en la cola y no se reprocesa.
-4. **Given** un mensaje con un `id_evento` que ya fue procesado exitosamente
+4. **Given** un mensaje con un `id_mensaje` que ya fue procesado exitosamente
    anteriormente, **When** el worker lo recibe de nuevo (reentrega del broker), **Then**
    el worker descarta el reenvío sin disparar una nueva notificación y hace ack.
 
@@ -127,21 +127,21 @@ entrega, o agota los reintentos y marca el mensaje como fallido de forma visible
 ### User Story 4 - Descartar mensajes duplicados (idempotencia) (Priority: P2)
 
 Como sistema, cuando el broker reentrega un mensaje que ya fue procesado exitosamente
-(identificado por `id_evento`), el worker debe reconocerlo y descartarlo sin volver a
+(identificado por `id_mensaje`), el worker debe reconocerlo y descartarlo sin volver a
 enviar la notificación.
 
 **Why this priority**: Evita notificaciones duplicadas al usuario final, un problema de
 confiabilidad tan importante como el rechazo de mensajes inválidos (US2). Depende de que
 exista el flujo feliz (US1).
 
-**Independent Test**: Se puede probar publicando el mismo mensaje (mismo `id_evento`) dos
+**Independent Test**: Se puede probar publicando el mismo mensaje (mismo `id_mensaje`) dos
 veces y verificando que solo se dispara un único envío de notificación.
 
 **Acceptance Scenarios**:
 
-1. **Given** un mensaje con `id_evento` ya procesado exitosamente, **When** el worker lo
+1. **Given** un mensaje con `id_mensaje` ya procesado exitosamente, **When** el worker lo
    recibe nuevamente, **Then** no dispara un nuevo envío y confirma (ack) el mensaje.
-2. **Given** un mensaje con `id_evento` nuevo (nunca visto), **When** el worker lo
+2. **Given** un mensaje con `id_mensaje` nuevo (nunca visto), **When** el worker lo
    recibe, **Then** lo procesa normalmente (US1).
 
 ---
@@ -169,7 +169,7 @@ veces y verificando que solo se dispara un único envío de notificación.
 - **FR-001**: El worker DEBE consumir mensajes desde una cola del broker de mensajes
   (RabbitMQ) dedicada a eventos de notificación.
 - **FR-002**: El worker DEBE validar cada mensaje contra el esquema mínimo de trabajo
-  definido en Key Entities (`canal`, `destinatario`, `contenido`, `id_evento`) antes de
+  definido en Key Entities (`canal`, `destinatario`, `contenido`, `id_mensaje`) antes de
   procesarlo (Principio III y IV de la Constitution). El contrato final y completo se
   validará contra la documentación externa del repo "puerta de entrada" cuando esté
   disponible.
@@ -196,7 +196,7 @@ veces y verificando que solo se dispara un único envío de notificación.
 - **FR-010**: El worker NO DEBE ser accesible directamente por ningún frontend; solo
   consume mensajes publicados por el repo "puerta de entrada" del sistema (Principio V).
 - **FR-011**: El worker DEBE identificar mensajes duplicados mediante el campo
-  `id_evento` y descartarlos (sin reenviar la notificación) si ese `id_evento` ya fue
+  `id_mensaje` y descartarlos (sin reenviar la notificación) si ese `id_mensaje` ya fue
   procesado exitosamente anteriormente.
 - **FR-012**: El worker NO DEBE validar si el destinatario tiene el canal habilitado
   (ej. mail registrado, push suscripto); asume que el emisor del mensaje ya lo validó. Un
@@ -207,7 +207,7 @@ veces y verificando que solo se dispara un único envío de notificación.
 - **Mensaje de notificación**: Representa un pedido de envío ya decidido por otro
   componente del sistema. Esquema mínimo de trabajo para esta feature (sujeto a
   confirmación en el contrato externo — ver Principio III de la Constitution):
-  - `id_evento`: identificador único del evento/mensaje, usado para detectar duplicados.
+  - `id_mensaje`: identificador único del mensaje, usado para detectar duplicados.
   - `canal`: `"push"` | `"mail"`.
   - `destinatario`: identificador del destinatario (se asume ya resuelto/válido por el
     emisor para el canal indicado).
@@ -217,7 +217,7 @@ veces y verificando que solo se dispara un único envío de notificación.
   por un canal dado: éxito, fallo transitorio (se reencola vía RabbitMQ), o fallo
   definitivo (dead-letter tras agotar el límite de entregas de la cola).
 - **Registro de mensajes procesados**: Mecanismo de idempotencia que permite al worker
-  saber si un `id_evento` ya fue procesado exitosamente, para poder descartar reentregas
+  saber si un `id_mensaje` ya fue procesado exitosamente, para poder descartar reentregas
   duplicadas (FR-011). Su implementación concreta se define en la fase de planificación.
 
 ## Success Criteria *(mandatory)*
@@ -234,7 +234,7 @@ veces y verificando que solo se dispara un único envío de notificación.
 - **SC-004**: Ningún mensaje se pierde silenciosamente: todo mensaje termina en uno de
   estos cuatro estados trazables — entregado, rechazado/dead-letter, descartado por
   duplicado, o fallido tras agotar el límite de entregas.
-- **SC-005**: El 100% de los mensajes con un `id_evento` ya procesado exitosamente se
+- **SC-005**: El 100% de los mensajes con un `id_mensaje` ya procesado exitosamente se
   descartan sin generar un envío duplicado de notificación.
 
 ## Assumptions
@@ -243,7 +243,7 @@ veces y verificando que solo se dispara un único envío de notificación.
   definida, incluyendo configuración de dead-letter exchange y límite de entregas; el
   setup/infraestructura del broker en sí queda fuera de esta feature (se aborda en una
   feature posterior, según lo indicado por el usuario).
-- El esquema mínimo de trabajo (`canal`, `destinatario`, `contenido`, `id_evento`) es una
+- El esquema mínimo de trabajo (`canal`, `destinatario`, `contenido`, `id_mensaje`) es una
   base para el plan técnico de esta feature; el contrato final y completo se validará
   contra la documentación externa del repo "puerta de entrada" cuando esté disponible
   (Principio III de la Constitution).
