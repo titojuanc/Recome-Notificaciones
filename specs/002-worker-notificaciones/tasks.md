@@ -115,12 +115,14 @@ dead-letter/rechazo.
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload sin `canal`
-      en `tests/unit/test_mensaje_model.py` (mismo archivo que T010, casos adicionales)
-- [ ] T021 [P] [US2] 🟢 Unit test: `MensajeNotificacion` rechaza `canal` no soportado
-      (ej. `"sms"`) en el mismo archivo
-- [ ] T022 [P] [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload con campo
-      extra no declarado (`extra="forbid"`) en el mismo archivo
+- [ ] T020 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload sin `canal`
+      en `tests/unit/test_mensaje_model.py` (mismo archivo que T010; no paralelizable
+      con T021/T022 por ser el mismo archivo)
+- [ ] T021 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza `canal` no soportado
+      (ej. `"sms"`) en el mismo archivo (secuencial respecto a T020/T022)
+- [ ] T022 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload con campo
+      extra no declarado (`extra="forbid"`) en el mismo archivo (secuencial respecto
+      a T020/T021)
 - [ ] T023 [US2] 🔴 Contract/integration test: mensaje inválido publicado en cola real
       termina en dead-letter sin generar envío, en
       `tests/contract/test_consumer_mensaje_invalido.py` (depende de T014 como base)
@@ -271,7 +273,8 @@ Constitution). Esto significa que, en la práctica:
 - T006, T007 (Foundational, modelos) en paralelo
 - T010, T011, T012, T013 (tests US1) en paralelo entre sí
 - T015, T016 (clientes de canal US1) en paralelo
-- T020, T021, T022 (tests US2) en paralelo
+- T020, T021, T022 (tests US2, mismo archivo) → secuenciales entre sí, pero el
+  bloque completo puede ir en paralelo con T027 (test US4, archivo distinto)
 - T027 (test US4) puede ir en paralelo con tests de US2
 - T032 (test US3) puede ir en paralelo con otros tests de integración
 
