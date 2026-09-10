@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MensajeNotificacion",
+  "description": "Esquema mínimo de trabajo para el mensaje de notificación consumido por el worker. NOTA: este es un esquema de trabajo interno para esta feature; el contrato final y oficial se documenta en el repo 'puerta de entrada' del sistema (ver Principio III de la Constitution) y puede diferir en detalle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id_mensaje", "canal", "destinatario", "contenido"],
+  "properties": {
+    "id_mensaje": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identificador único del mensaje, usado para deduplicación."
+    },
+    "canal": {
+      "type": "string",
+      "enum": ["push", "mail"],
+      "description": "Canal de envío indicado por el emisor del mensaje."
+    },
+    "destinatario": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identificador del destinatario para el canal indicado (token push o dirección de mail). Se asume validado por el emisor."
+    },
+    "contenido": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["titulo", "cuerpo"],
+      "properties": {
+        "titulo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cuerpo": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Contenido ya resuelto de la notificación. El mecanismo de plantillas queda fuera de alcance (decisión de diseño pendiente)."
+    }
+  }
+}
