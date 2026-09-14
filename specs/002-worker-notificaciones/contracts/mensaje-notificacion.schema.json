@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MensajeNotificacion",
+  "description": "Esquema mínimo de trabajo para el mensaje de notificación consumido por el worker. NOTA: este es un esquema de trabajo interno para esta feature; el contrato final y oficial se documenta en el repo 'puerta de entrada' del sistema (ver Principio III de la Constitution) y puede diferir en detalle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id_mensaje", "canal", "destinatario", "contenido"],
+  "properties": {
+    "id_mensaje": {
+      "type": "integer",
+      "description": "Identificador único numérico del mensaje, usado para deduplicación."
+    },
+    "canal": {
+      "type": "string",
+      "enum": ["push", "mail"],
+      "description": "Canal de envío indicado por el emisor del mensaje."
+    },
+    "destinatario": {
+      "type": "integer",
+      "description": "Id numérico del usuario, usado solo para trazabilidad/logging. No es el dato de contacto real usado para enviar."
+    },
+    "mail": {
+      "type": ["string", "null"],
+      "format": "email",
+      "description": "Dirección de correo ya resuelta por el emisor. Obligatoria si y solo si canal = 'mail'; debe estar ausente/null si canal = 'push'."
+    },
+    "push_sub": {
+      "description": "Web Push Subscription ya resuelta por el emisor. Obligatoria si y solo si canal = 'push'; debe estar ausente/null si canal = 'mail'.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["endpoint", "keys"],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "keys": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["p256dh", "auth"],
+              "properties": {
+                "p256dh": { "type": "string", "minLength": 1 },
+                "auth": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "contenido": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["titulo", "cuerpo"],
+      "properties": {
+        "titulo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cuerpo": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Contenido ya resuelto de la notificación. El mecanismo de plantillas queda fuera de alcance (decisión de diseño pendiente)."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "canal": { "const": "mail" } }
+      },
+      "then": {
+        "required": ["mail"],
+        "properties": {
+          "push_sub": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "canal": { "const": "push" } }
+      },
+      "then": {
+        "required": ["push_sub"],
+        "properties": {
+          "mail": { "type": "null" }
+        }
+      }
+    }
+  ]
+}
+
