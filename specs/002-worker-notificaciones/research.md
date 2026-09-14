@@ -101,6 +101,44 @@ problemas reales de wiring (exchanges, colas, dead-letter).
 de testing (no cumple el mandato de integration tests reales de la Constitution),
 aunque se usa complementariamente para unit tests 🟢 de lógica pura.
 
+## 6. Testing del canal `mail`: Mailpit
+
+**Decisión**: Usar [Mailpit](https://github.com/axllent/mailpit) como servidor SMTP
+falso, corriendo en un contenedor Docker (`recome-mailpit`, en la misma red que
+RabbitMQ). El worker le apunta a Mailpit (`SMTP_HOST`/`SMTP_PORT`) en desarrollo y
+en integration tests; Mailpit expone una UI web (`:8025`) para inspeccionar los
+mails capturados, sin enviar nada real a internet.
+
+**Racional**: Es el estándar de facto para testear envío de mail sin depender de un
+proveedor real ni arriesgar mandar correos de verdad durante tests automatizados.
+Permite un test de integración 🟡 genuino (contra un servidor SMTP real, no un mock)
+sin salir de la red local.
+
+**Alternativas consideradas**: Mock completo del cliente SMTP — se usa
+complementariamente para unit tests 🟢, pero no reemplaza el test de integración 🟡
+contra un servidor SMTP real (Mailpit cumple ese rol sin riesgo de envío real).
+
+## 7. Testing del canal `push`: mock de `pywebpush`
+
+**Decisión**: Para tests de integración 🟡, mockear la librería `pywebpush` en el
+punto de llamada (verificar que se invoca con el `endpoint`/`keys`/payload
+correctos), en lugar de pegarle a un servicio push real (FCM, Mozilla, etc.).
+
+**Racional**: A diferencia de mail, no existe un equivalente ampliamente adoptado a
+"Mailpit para push" — los servicios push reales (FCM, Mozilla Push Service) no
+tienen un modo sandbox trivial de levantar en Docker para CI. Mockear la llamada de
+`pywebpush` es la opción más simple (Principio VII) que sigue verificando la lógica
+propia del adaptador (armado de payload, manejo de errores del SDK).
+
+**Validación manual complementaria (no automatizada)**: para confirmar el flujo real
+de punta a punta al menos una vez, se puede generar una Web Push Subscription real
+desde un navegador de prueba y enviar un push real — queda documentado como paso
+exploratorio en `quickstart.md`, no como parte de la suite de tests de CI.
+
+**Alternativas consideradas**: Levantar un servidor push falso propio — rechazado
+por complejidad desproporcionada para el beneficio (Principio VII); no hay
+herramienta estándar madura para esto en el ecosistema.
+
 ## Resumen de decisiones para `plan.md`
 
 | Aspecto | Resuelto como |
@@ -109,7 +147,9 @@ aunque se usa complementariamente para unit tests 🟢 de lógica pura.
 | Storage (dedup) | SQLite embebido local, tabla `id_mensaje` + timestamp |
 | Cliente RabbitMQ | `pika` síncrono, `BlockingConnection` |
 | Validación | `pydantic` v2, `extra="forbid"` |
-| Integration testing | RabbitMQ real vía Docker en CI/local |
+| Integration testing (RabbitMQ) | RabbitMQ real vía Docker en CI/local (`recome-rabbitmq`) |
+| Integration testing (mail) | Mailpit (SMTP falso) vía Docker (`recome-mailpit`) |
+| Integration testing (push) | Mock de `pywebpush`; validación manual real como paso exploratorio complementario |
 
 Todas las incógnitas de `plan.md` quedan resueltas; no quedan `NEEDS CLARIFICATION`
 pendientes para avanzar a Phase 1 (data-model, contracts, quickstart).

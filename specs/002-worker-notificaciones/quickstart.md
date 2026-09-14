@@ -13,17 +13,55 @@ ante fallos transitorios al propio RabbitMQ.
 - Python 3.11+
 - Un RabbitMQ accesible (local vía Docker para desarrollo/tests, o el de
   infraestructura compartida en otros ambientes)
+- Mailpit (servidor SMTP falso, para probar el canal `mail` sin enviar correos
+  reales durante desarrollo/tests)
 - Variables de entorno (ver `.env.example`, a crear en fase de implementación):
   - `RABBITMQ_URL`
   - `RABBITMQ_QUEUE_NOTIFICACIONES`
   - `SQLITE_DEDUP_PATH`
-  - Credenciales de los proveedores push/mail (a definir en implementación)
+  - `SMTP_HOST`, `SMTP_PORT` (apuntan a Mailpit en desarrollo/tests)
+  - Credenciales de push real (VAPID keys para `pywebpush`, a definir en
+    implementación)
 
-## Levantar RabbitMQ localmente (para desarrollo/tests)
+## Levantar RabbitMQ y Mailpit localmente (para desarrollo/tests)
+
+Se usa una red Docker dedicada para que, en el futuro, el worker (corriendo también
+en un contenedor) pueda resolver estos servicios por nombre en vez de IP.
 
 ```bash
-docker run -d --name rabbitmq-dev -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+docker network create recome-notificaciones-net
+
+docker run -d --name recome-rabbitmq --network recome-notificaciones-net \
+  -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+
+docker run -d --name recome-mailpit --network recome-notificaciones-net \
+  -p 1025:1025 -p 8025:8025 axllent/mailpit
 ```
+
+**RabbitMQ**:
+- Panel de administración: `http://localhost:15672` (usuario/clave por defecto:
+  `guest`/`guest`)
+- Puerto AMQP (para `pika`, o `RABBITMQ_URL`): `5672`
+
+**Mailpit** (servidor SMTP falso para el canal `mail`):
+- Puerto SMTP (para el cliente de mail del worker, `SMTP_HOST`/`SMTP_PORT`): `1025`
+- UI web para ver los mails "enviados": `http://localhost:8025` — ningún mail sale
+  realmente a internet, todo queda capturado acá.
+
+Si el worker corre como contenedor en la misma red, usar `recome-rabbitmq` y
+`recome-mailpit` como hostnames (en vez de `localhost`).
+
+## Estrategia de testing por canal (sin depender de proveedores reales)
+
+| Canal | Nivel de test | Estrategia |
+|-------|---------------|------------|
+| `mail` | 🟡 Integración | Contra **Mailpit** (SMTP real, pero capturado localmente — sin salir a internet) |
+| `push` | 🟡 Integración | **Mock de `pywebpush`** (se verifica que se llama con los parámetros correctos; no existe un "servidor push falso" estándar como Mailpit) |
+| Ambos | 🔴 Contrato/consumer | El "envío" en sí sigue usando Mailpit (mail) o mock (push); lo que se valida acá es el wiring completo contra RabbitMQ real |
+
+Para probar el flujo real de push de punta a punta (no automatizado, exploratorio),
+se puede generar una Push Subscription real desde un navegador de prueba y enviarle
+un push real — pero esto no es apto para CI, solo para validación manual puntual.
 
 ## Ejecutar el worker (una vez implementado)
 

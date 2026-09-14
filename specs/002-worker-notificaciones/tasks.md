@@ -37,9 +37,13 @@ Proyecto único (single project), según `plan.md`:
       (cliente Web Push real para `push_sub`), `pytest`, `pytest-mock`
 - [ ] T003 [P] Configurar linting/formatting (`ruff` o `flake8` + `black`)
 - [ ] T004 [P] Crear `docker-compose.test.yml` con RabbitMQ (`rabbitmq:3-management`)
-      para integration/contract tests, según `quickstart.md`
+      y Mailpit (`axllent/mailpit`), ambos en una red Docker dedicada
+      (`recome-notificaciones-net`), para integration/contract tests, según
+      `quickstart.md` (RabbitMQ y Mailpit ya levantados manualmente para desarrollo
+      exploratorio; esta tarea formaliza el setup reproducible vía compose)
 - [ ] T005 [P] Crear `.env.example` con `RABBITMQ_URL`, `RABBITMQ_QUEUE_NOTIFICACIONES`,
-      `SQLITE_DEDUP_PATH` y placeholders de credenciales de proveedores
+      `SQLITE_DEDUP_PATH`, `SMTP_HOST`/`SMTP_PORT` (Mailpit) y placeholders de
+      credenciales VAPID para push
 
 ---
 
@@ -80,10 +84,12 @@ verificar que se dispara el envío correcto y se hace `ack`.
       payload completo, en `tests/unit/test_mensaje_model.py`
 - [ ] T011 [P] [US1] 🟢 Unit test: selección de canal (`push`→cliente push,
       `mail`→cliente mail) en `tests/unit/test_enrutamiento.py`
-- [ ] T012 [P] [US1] 🟡 Integration test: cliente push envía correctamente (mock del
-      SDK/proveedor) en `tests/integration/test_cliente_push.py`
-- [ ] T013 [P] [US1] 🟡 Integration test: cliente mail envía correctamente (mock del
-      SDK/proveedor) en `tests/integration/test_cliente_mail.py`
+- [ ] T012 [P] [US1] 🟡 Integration test: cliente push envía correctamente, mockeando
+      `pywebpush` (se verifica llamada con `endpoint`/`keys`/payload correctos; ver
+      `research.md` §7) en `tests/integration/test_cliente_push.py`
+- [ ] T013 [P] [US1] 🟡 Integration test: cliente mail envía correctamente contra
+      Mailpit real (SMTP falso en `recome-mailpit`, ver `research.md` §6) en
+      `tests/integration/test_cliente_mail.py`
 - [ ] T014 [US1] 🔴 Contract/integration test: consumer completo (mensaje válido en
       cola real de Docker → envío disparado → `ack`) en
       `tests/contract/test_consumer_flujo_feliz.py`
