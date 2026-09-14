@@ -137,6 +137,25 @@ pytest tests/integration   # 🟡 clientes push/mail (mockeados o sandbox real)
 pytest tests/contract      # 🔴 contra el schema de contracts/ + RabbitMQ real (Docker)
 ```
 
+## Dead-letter exchange
+
+El worker declara, para la cola configurada (`RABBITMQ_QUEUE_NOTIFICACIONES`), un
+exchange `<queue>.dlx` (fanout) enlazado a una cola `<queue>.dead-letter`, y declara
+la cola principal con el argumento `x-dead-letter-exchange` apuntando a ese exchange
+(ver `src/consumer/worker.py`, método `run`). Así:
+
+- Un mensaje rechazado por el worker (`nack(requeue=False)`, ej. payload inválido)
+  termina en `<queue>.dead-letter` automáticamente.
+- Un mensaje con fallo transitorio (`nack(requeue=True)`) es reencolado por
+  RabbitMQ en la cola principal (comportamiento nativo, sin lógica de reintento
+  propia del worker).
+
+**Limitación conocida**: esta iteración no configura un límite de entregas
+(`x-delivery-limit`, disponible en colas quorum) para forzar el paso automático a
+dead-letter tras N reintentos — un mensaje con fallo transitorio persistente se
+reencola indefinidamente salvo que el proveedor deje de fallar. Se documenta como
+mejora futura si se requiere ese límite.
+
 ## Limitaciones conocidas de esta iteración
 
 - La deduplicación usa SQLite local por instancia del worker: si se corren múltiples

@@ -30,18 +30,18 @@ Proyecto único (single project), según `plan.md`:
 
 **Purpose**: Inicialización del proyecto Python y estructura base
 
-- [ ] T001 Crear estructura de carpetas `src/{models,services/canales,consumer}` y
+- [x] T001 Crear estructura de carpetas `src/{models,services/canales,consumer}` y
       `tests/{unit,integration,contract}` según `plan.md`
-- [ ] T002 Inicializar proyecto Python 3.11 con `pyproject.toml`/`requirements.txt`:
+- [x] T002 Inicializar proyecto Python 3.11 con `pyproject.toml`/`requirements.txt`:
       `pika`, `pydantic>=2`, `pydantic[email]` (validación de `mail`), `pywebpush`
       (cliente Web Push real para `push_sub`), `pytest`, `pytest-mock`
-- [ ] T003 [P] Configurar linting/formatting (`ruff` o `flake8` + `black`)
-- [ ] T004 [P] Crear `docker-compose.test.yml` con RabbitMQ (`rabbitmq:3-management`)
+- [x] T003 [P] Configurar linting/formatting (`ruff` o `flake8` + `black`)
+- [x] T004 [P] Crear `docker-compose.test.yml` con RabbitMQ (`rabbitmq:3-management`)
       y Mailpit (`axllent/mailpit`), ambos en una red Docker dedicada
       (`recome-notificaciones-net`), para integration/contract tests, según
       `quickstart.md` (RabbitMQ y Mailpit ya levantados manualmente para desarrollo
       exploratorio; esta tarea formaliza el setup reproducible vía compose)
-- [ ] T005 [P] Crear `.env.example` con `RABBITMQ_URL`, `RABBITMQ_QUEUE_NOTIFICACIONES`,
+- [x] T005 [P] Crear `.env.example` con `RABBITMQ_URL`, `RABBITMQ_QUEUE_NOTIFICACIONES`,
       `SQLITE_DEDUP_PATH`, `SMTP_HOST`/`SMTP_PORT` (Mailpit) y placeholders de
       credenciales VAPID para push
 
@@ -54,16 +54,16 @@ poder implementarse
 
 **⚠️ CRITICAL**: Ninguna user story puede comenzar hasta completar esta fase
 
-- [ ] T006 🟢 Crear modelos `MensajeNotificacion`, `PushSubscription` y `Contenido`
+- [x] T006 🟢 Crear modelos `MensajeNotificacion`, `PushSubscription` y `Contenido`
       (pydantic, `extra="forbid"` en todos los niveles) con validador de modelo para
       la validación cruzada `canal`/`mail`/`push_sub` (FR-013), en
       `src/models/mensaje.py` según `data-model.md` §1 y
       `contracts/mensaje-notificacion.schema.json`
-- [ ] T007 [P] 🟢 Crear modelo `ResultadoEnvio` en `src/models/resultado.py` según
+- [x] T007 [P] 🟢 Crear modelo `ResultadoEnvio` en `src/models/resultado.py` según
       `data-model.md` §2
-- [ ] T008 Crear `src/config.py`: carga de variables de entorno (`RABBITMQ_URL`,
+- [x] T008 Crear `src/config.py`: carga de variables de entorno (`RABBITMQ_URL`,
       `SQLITE_DEDUP_PATH`, etc.) (depende de T005)
-- [ ] T009 Configurar logging estructurado base en `src/logging_config.py` (para
+- [x] T009 Configurar logging estructurado base en `src/logging_config.py` (para
       cumplir FR-008: trazabilidad de mensajes rechazados/fallidos/duplicados)
 
 **Checkpoint**: Fundación lista — las user stories pueden comenzar
@@ -80,35 +80,35 @@ verificar que se dispara el envío correcto y se hace `ack`.
 
 ### Tests for User Story 1 (escribir primero, deben fallar antes de implementar)
 
-- [ ] T010 [P] [US1] 🟢 Unit test: validación exitosa de `MensajeNotificacion` con
+- [x] T010 [P] [US1] 🟢 Unit test: validación exitosa de `MensajeNotificacion` con
       payload completo, en `tests/unit/test_mensaje_model.py`
-- [ ] T011 [P] [US1] 🟢 Unit test: selección de canal (`push`→cliente push,
+- [x] T011 [P] [US1] 🟢 Unit test: selección de canal (`push`→cliente push,
       `mail`→cliente mail) en `tests/unit/test_enrutamiento.py`
-- [ ] T012 [P] [US1] 🟡 Integration test: cliente push envía correctamente, mockeando
+- [x] T012 [P] [US1] 🟡 Integration test: cliente push envía correctamente, mockeando
       `pywebpush` (se verifica llamada con `endpoint`/`keys`/payload correctos; ver
       `research.md` §7) en `tests/integration/test_cliente_push.py`
-- [ ] T013 [P] [US1] 🟡 Integration test: cliente mail envía correctamente contra
+- [x] T013 [P] [US1] 🟡 Integration test: cliente mail envía correctamente contra
       Mailpit real (SMTP falso en `recome-mailpit`, ver `research.md` §6) en
       `tests/integration/test_cliente_mail.py`
-- [ ] T014 [US1] 🔴 Contract/integration test: consumer completo (mensaje válido en
+- [x] T014 [US1] 🔴 Contract/integration test: consumer completo (mensaje válido en
       cola real de Docker → envío disparado → `ack`) en
       `tests/contract/test_consumer_flujo_feliz.py`
 
 ### Implementation for User Story 1
 
-- [ ] T015 [P] [US1] Implementar `src/services/canales/push.py` (adaptador de envío
+- [x] T015 [P] [US1] Implementar `src/services/canales/push.py` (adaptador de envío
       push vía `pywebpush` usando el objeto `push_sub` (endpoint + keys) del
       mensaje; interfaz simple `enviar(push_sub, contenido) -> ResultadoEnvio`)
-- [ ] T016 [P] [US1] Implementar `src/services/canales/mail.py` (adaptador de envío
+- [x] T016 [P] [US1] Implementar `src/services/canales/mail.py` (adaptador de envío
       mail usando el campo `mail` del mensaje; interfaz simple
       `enviar(mail, contenido) -> ResultadoEnvio`)
-- [ ] T017 [US1] Implementar `src/services/enrutador.py`: dado un `MensajeNotificacion`,
+- [x] T017 [US1] Implementar `src/services/enrutador.py`: dado un `MensajeNotificacion`,
       selecciona el cliente de canal correspondiente (depende de T015, T016)
-- [ ] T018 [US1] Implementar `src/consumer/worker.py`: conexión `pika`
+- [x] T018 [US1] Implementar `src/consumer/worker.py`: conexión `pika`
       `BlockingConnection`, `basic_consume` con `prefetch_count` bajo (configurable),
       callback que parsea+valida el mensaje, invoca `enrutador`, y hace `ack` si el
       envío fue exitoso (depende de T006, T008, T017)
-- [ ] T019 [US1] Conectar logging de envíos exitosos en el consumer (depende de T009,
+- [x] T019 [US1] Conectar logging de envíos exitosos en el consumer (depende de T009,
       T018)
 
 **Checkpoint**: User Story 1 funcional y testeable de forma independiente (MVP)
@@ -126,34 +126,34 @@ dead-letter/rechazo.
 
 ### Tests for User Story 2
 
-- [ ] T020 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload sin `canal`
+- [x] T020 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload sin `canal`
       en `tests/unit/test_mensaje_model.py` (mismo archivo que T010; no paralelizable
       con T021/T022 por ser el mismo archivo)
-- [ ] T021 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza `canal` no soportado
+- [x] T021 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza `canal` no soportado
       (ej. `"sms"`) en el mismo archivo (secuencial respecto a T020/T022)
-- [ ] T022 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload con campo
+- [x] T022 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload con campo
       extra no declarado (`extra="forbid"`) en el mismo archivo (secuencial respecto
       a T020/T021)
-- [ ] T022b [US2] 🟢 Unit test: validación cruzada `canal`/`mail`/`push_sub`
+- [x] T022b [US2] 🟢 Unit test: validación cruzada `canal`/`mail`/`push_sub`
       (FR-013) — casos: `canal="mail"` sin `mail`, `canal="mail"` con `push_sub`
       presente, `canal="push"` sin `push_sub`, `canal="push"` con `mail` presente;
       los 4 casos deben ser rechazados, en el mismo archivo (secuencial respecto a
       T020/T021/T022)
-- [ ] T022c [US2] 🟢 Unit test: `MensajeNotificacion` rechaza `mail` con formato
+- [x] T022c [US2] 🟢 Unit test: `MensajeNotificacion` rechaza `mail` con formato
       inválido (ej. sin `@`) cuando `canal = "mail"` (FR-015), en el mismo archivo
       (secuencial respecto a T020/T021/T022/T022b)
-- [ ] T023 [US2] 🔴 Contract/integration test: mensaje inválido publicado en cola real
+- [x] T023 [US2] 🔴 Contract/integration test: mensaje inválido publicado en cola real
       termina en dead-letter sin generar envío, en
       `tests/contract/test_consumer_mensaje_invalido.py` (depende de T014 como base)
 
 ### Implementation for User Story 2
 
-- [ ] T024 [US2] Extender `src/consumer/worker.py`: capturar error de validación
+- [x] T024 [US2] Extender `src/consumer/worker.py`: capturar error de validación
       pydantic en el callback y hacer `nack(requeue=False)` (o publish a dead-letter
       exchange según configuración de la cola) (depende de T018)
-- [ ] T025 [US2] Agregar logging de mensajes rechazados con motivo (FR-008) en
+- [x] T025 [US2] Agregar logging de mensajes rechazados con motivo (FR-008) en
       `src/consumer/worker.py` (depende de T009, T024)
-- [ ] T026 [US2] Documentar/configurar el dead-letter exchange en
+- [x] T026 [US2] Documentar/configurar el dead-letter exchange en
       `docker-compose.test.yml` y en `quickstart.md` si falta detalle (depende de T004)
 
 **Checkpoint**: User Stories 1 y 2 funcionan de forma independiente
@@ -174,22 +174,22 @@ verificar que solo se dispara un único envío.
 
 ### Tests for User Story 4
 
-- [ ] T027 [P] [US4] 🟢 Unit test: `RegistroMensajeProcesado.existe()` devuelve
+- [x] T027 [P] [US4] 🟢 Unit test: `RegistroMensajeProcesado.existe()` devuelve
       `False` para un `id_mensaje` nuevo y `True` tras `registrar()`, en
       `tests/unit/test_dedup.py`
-- [ ] T028 [US4] 🔴 Contract/integration test: mismo mensaje publicado dos veces en
+- [x] T028 [US4] 🔴 Contract/integration test: mismo mensaje publicado dos veces en
       cola real genera un único envío, en
       `tests/contract/test_consumer_duplicado.py` (depende de T014)
 
 ### Implementation for User Story 4
 
-- [ ] T029 [US4] Implementar `src/services/dedup.py`: `RegistroMensajeProcesado` sobre
+- [x] T029 [US4] Implementar `src/services/dedup.py`: `RegistroMensajeProcesado` sobre
       SQLite (tabla `processed_messages`, operaciones `existe`/`registrar`) según
       `data-model.md` §3
-- [ ] T030 [US4] Integrar `dedup.py` en `src/consumer/worker.py`: verificar
+- [x] T030 [US4] Integrar `dedup.py` en `src/consumer/worker.py`: verificar
       `existe(id_mensaje)` antes de enrutar; si existe, `ack` sin enviar; si no,
       procesar y `registrar()` tras envío exitoso (depende de T017, T018, T029)
-- [ ] T031 [US4] Agregar logging de mensajes duplicados descartados (FR-008) (depende
+- [x] T031 [US4] Agregar logging de mensajes duplicados descartados (FR-008) (depende
       de T009, T030)
 
 **Checkpoint**: User Stories 1, 2 y 4 funcionan de forma independiente
@@ -208,27 +208,27 @@ eventualmente entregado, o agota el límite de entregas y termina en dead-letter
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] 🟡 Integration test: cliente push/mail lanza una excepción
+- [x] T032 [P] [US3] 🟡 Integration test: cliente push/mail lanza una excepción
       "transitoria" simulada (ej. timeout mockeado) en
       `tests/integration/test_fallo_transitorio.py`
-- [ ] T033 [US3] 🔴 Contract/integration test: mensaje reencolado por fallo
+- [x] T033 [US3] 🔴 Contract/integration test: mensaje reencolado por fallo
       transitorio se entrega en un intento posterior (usando `x-delivery-count` /
       límite de entregas configurado en RabbitMQ) en
       `tests/contract/test_consumer_reencolado.py` (depende de T014)
-- [ ] T034 [US3] 🔴 Contract/integration test: mensaje que agota el límite de
+- [x] T034 [US3] 🔴 Contract/integration test: mensaje que agota el límite de
       entregas configurado termina en la dead-letter exchange, en el mismo archivo
       que T033
 
 ### Implementation for User Story 3
 
-- [ ] T035 [US3] Configurar la cola de notificaciones en `docker-compose.test.yml`
+- [x] T035 [US3] Configurar la cola de notificaciones en `docker-compose.test.yml`
       (o script de setup) con `x-dead-letter-exchange` y límite de entregas
       (`x-delivery-limit` o patrón de conteo vía header), según `research.md` (depende
       de T004)
-- [ ] T036 [US3] Extender `src/consumer/worker.py`: capturar excepción de envío del
+- [x] T036 [US3] Extender `src/consumer/worker.py`: capturar excepción de envío del
       proveedor (distinta de error de validación) y hacer
       `nack(requeue=True)` sin lógica de reintento propia (depende de T018, T024)
-- [ ] T037 [US3] Agregar logging de fallos transitorios y de mensajes que llegan a
+- [x] T037 [US3] Agregar logging de fallos transitorios y de mensajes que llegan a
       dead-letter tras agotar el límite de entregas (FR-008) (depende de T009, T036)
 
 **Checkpoint**: Las 4 user stories funcionan de forma independiente y en conjunto
@@ -239,15 +239,15 @@ eventualmente entregado, o agota el límite de entregas y termina en dead-letter
 
 **Purpose**: Mejoras que afectan a todas las user stories
 
-- [ ] T038 [P] Ejecutar y validar manualmente `quickstart.md` completo (levantar
+- [x] T038 [P] Ejecutar y validar manualmente `quickstart.md` completo (levantar
       RabbitMQ, correr worker, publicar mensajes de prueba)
-- [ ] T039 [P] Revisar cobertura de logging: todo mensaje termina en uno de los 4
+- [x] T039 [P] Revisar cobertura de logging: todo mensaje termina en uno de los 4
       estados trazables de SC-004 (entregado, rechazado/dead-letter, duplicado
       descartado, fallido tras agotar entregas)
-- [ ] T040 Configurar CI (GitHub Actions) para correr `tests/unit`,
+- [x] T040 Configurar CI (GitHub Actions) para correr `tests/unit`,
       `tests/integration`, `tests/contract` (con RabbitMQ vía Docker) en cada PR,
       según Constitution § Development Workflow
-- [ ] T041 [P] Documentar en `README.md` del repo cómo correr el worker y los tests
+- [x] T041 [P] Documentar en `README.md` del repo cómo correr el worker y los tests
 
 ---
 
