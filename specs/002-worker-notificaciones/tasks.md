@@ -133,6 +133,9 @@ dead-letter/rechazo.
       presente, `canal="push"` sin `push_sub`, `canal="push"` con `mail` presente;
       los 4 casos deben ser rechazados, en el mismo archivo (secuencial respecto a
       T020/T021/T022)
+- [ ] T022c [US2] 🟢 Unit test: `MensajeNotificacion` rechaza `mail` con formato
+      inválido (ej. sin `@`) cuando `canal = "mail"` (FR-015), en el mismo archivo
+      (secuencial respecto a T020/T021/T022/T022b)
 - [ ] T023 [US2] 🔴 Contract/integration test: mensaje inválido publicado en cola real
       termina en dead-letter sin generar envío, en
       `tests/contract/test_consumer_mensaje_invalido.py` (depende de T014 como base)
@@ -328,7 +331,8 @@ Task: "Implementar src/services/canales/mail.py"
 
 ### Aplicación del rigor TDD por tarea (Principio VI de la Constitution)
 
-- 🟢 **TDD estricto** (T006, T007, T010, T011, T020, T021, T022, T022b, T027): ciclo
+- 🟢 **TDD estricto** (T006, T007, T010, T011, T020, T021, T022, T022b, T022c,
+  T027): ciclo
   red-green-refactor completo, sin mocks de infraestructura pesada.
 - 🟡 **Test-first de integración** (T012, T013, T032): interfaz mock-first + test de
   integración contra el cliente del proveedor (real o sandbox).

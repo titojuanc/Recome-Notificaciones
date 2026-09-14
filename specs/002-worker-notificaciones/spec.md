@@ -53,6 +53,10 @@
   obligatorio y `mail` debe estar ausente. Un mensaje con el campo "equivocado"
   presente para su canal, o sin el campo requerido, se considera inválido (rechazo,
   ver US2/FR-005).
+- Q: Si `mail` está presente pero con formato inválido (ej. sin `@`), ¿se rechaza
+  como mensaje inválido o se intenta enviar de todos modos? → A: Se rechaza como
+  mensaje inválido (dead-letter): el formato de `mail` se valida como parte de la
+  validación estricta de payload (FR-005/Principio IV), igual que `canal`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -246,6 +250,10 @@ veces y verificando que solo se dispara un único envío de notificación.
 - **FR-014**: El worker NO DEBE incluir ni depender de ningún campo de "tipo de
   evento" en el mensaje; ese concepto pertenece al dominio del algoritmo de
   recomendación y es explícitamente ajeno a este repo (Principio I).
+- **FR-015**: El worker DEBE validar el formato del campo `mail` (estructura de
+  dirección de correo válida) cuando `canal = "mail"`; un `mail` con formato
+  inválido se trata como mensaje inválido (rechazo/dead-letter, FR-005), no como un
+  fallo técnico del proveedor.
 
 ### Key Entities
 
