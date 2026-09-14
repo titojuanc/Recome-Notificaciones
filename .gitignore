@@ -6,3 +6,5 @@ data/
 .pytest_cache/
 .ruff_cache/
 *.db
+worker.log
+worker.pid
