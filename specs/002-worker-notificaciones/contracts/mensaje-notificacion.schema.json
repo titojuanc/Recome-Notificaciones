@@ -7,9 +7,8 @@
   "required": ["id_mensaje", "canal", "destinatario", "contenido"],
   "properties": {
     "id_mensaje": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Identificador único del mensaje, usado para deduplicación."
+      "type": "integer",
+      "description": "Identificador único numérico del mensaje, usado para deduplicación."
     },
     "canal": {
       "type": "string",
@@ -17,9 +16,39 @@
       "description": "Canal de envío indicado por el emisor del mensaje."
     },
     "destinatario": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Identificador del destinatario para el canal indicado (token push o dirección de mail). Se asume validado por el emisor."
+      "type": "integer",
+      "description": "Id numérico del usuario, usado solo para trazabilidad/logging. No es el dato de contacto real usado para enviar."
+    },
+    "mail": {
+      "type": ["string", "null"],
+      "format": "email",
+      "description": "Dirección de correo ya resuelta por el emisor. Obligatoria si y solo si canal = 'mail'; debe estar ausente/null si canal = 'push'."
+    },
+    "push_sub": {
+      "description": "Web Push Subscription ya resuelta por el emisor. Obligatoria si y solo si canal = 'push'; debe estar ausente/null si canal = 'mail'.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["endpoint", "keys"],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "keys": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["p256dh", "auth"],
+              "properties": {
+                "p256dh": { "type": "string", "minLength": 1 },
+                "auth": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      ]
     },
     "contenido": {
       "type": "object",
@@ -37,5 +66,30 @@
       },
       "description": "Contenido ya resuelto de la notificación. El mecanismo de plantillas queda fuera de alcance (decisión de diseño pendiente)."
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "canal": { "const": "mail" } }
+      },
+      "then": {
+        "required": ["mail"],
+        "properties": {
+          "push_sub": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "canal": { "const": "push" } }
+      },
+      "then": {
+        "required": ["push_sub"],
+        "properties": {
+          "mail": { "type": "null" }
+        }
+      }
+    }
+  ]
 }
+

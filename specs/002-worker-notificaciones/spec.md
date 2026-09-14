@@ -31,6 +31,29 @@
   `nack` ante fallo transitorio y deja que RabbitMQ reencole, sin lógica de reintento
   propia.
 
+### Session 2026-09-14
+
+- Q: `id_mensaje` y `destinatario` ¿qué tipo de dato tienen? → Numéricos (no strings).
+  `destinatario` es el id numérico del usuario en el sistema, usado solo para
+  trazabilidad/logging.
+- Q: ¿La notificación lleva un tipo de evento (para alimentar el algoritmo de
+  recomendación)? → No. Ese dominio (eventos para el algoritmo) es ajeno a
+  notificaciones y no forma parte de este mensaje ni de este repo.
+- Q: ¿Cómo obtiene el worker el mail o la subscription push para enviar, sin acceder
+  a una BDD ajena (Principio II)? → El mensaje llega con los datos de contacto ya
+  resueltos: campo `mail` (si `canal = "mail"`) o campo `push_sub` (si
+  `canal = "push"`), provistos por el emisor del mensaje. El worker nunca consulta
+  ninguna base de datos para resolverlos.
+- Q: ¿`push_sub` es un string simple o una estructura? → Objeto con el formato
+  estándar de Web Push Subscription del navegador: `endpoint` (string) + `keys`
+  (`p256dh` y `auth`, ambos string).
+- Q: ¿`mail` y `push_sub` son mutuamente excluyentes según `canal`, o pueden venir
+  ambos siempre? → Son condicionales y estrictos: si `canal = "mail"`, `mail` es
+  obligatorio y `push_sub` debe estar ausente; si `canal = "push"`, `push_sub` es
+  obligatorio y `mail` debe estar ausente. Un mensaje con el campo "equivocado"
+  presente para su canal, o sin el campo requerido, se considera inválido (rechazo,
+  ver US2/FR-005).
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
@@ -171,6 +194,10 @@ veces y verificando que solo se dispara un único envío de notificación.
   esa responsabilidad es del emisor del mensaje. Si el envío falla porque el destinatario
   no tiene el canal habilitado, el worker lo trata como un fallo del proveedor (fallo
   técnico de envío), no como un mensaje inválido.
+- ¿Qué pasa si un mensaje con `canal = "mail"` trae también `push_sub`, o con
+  `canal = "push"` trae también `mail`? Se trata como mensaje inválido (FR-013): la
+  presencia del campo de contacto "equivocado" para el canal indicado es motivo de
+  rechazo, igual que la ausencia del campo requerido.
 
 ## Requirements *(mandatory)*
 
@@ -179,10 +206,10 @@ veces y verificando que solo se dispara un único envío de notificación.
 - **FR-001**: El worker DEBE consumir mensajes desde una cola del broker de mensajes
   (RabbitMQ) dedicada a eventos de notificación.
 - **FR-002**: El worker DEBE validar cada mensaje contra el esquema mínimo de trabajo
-  definido en Key Entities (`canal`, `destinatario`, `contenido`, `id_mensaje`) antes de
-  procesarlo (Principio III y IV de la Constitution). El contrato final y completo se
-  validará contra la documentación externa del repo "puerta de entrada" cuando esté
-  disponible.
+  definido en Key Entities (`id_mensaje`, `canal`, `destinatario`, `mail`, `push_sub`,
+  `contenido`) antes de procesarlo (Principio III y IV de la Constitution). El
+  contrato final y completo se validará contra la documentación externa del repo
+  "puerta de entrada" cuando esté disponible.
 - **FR-003**: El worker DEBE interpretar el campo `canal` del mensaje y enrutar el envío
   exclusivamente a: notificación push, o notificación por mail, según ese campo.
 - **FR-004**: El worker NO DEBE decidir por sí mismo si corresponde notificar o no, ni
@@ -211,16 +238,30 @@ veces y verificando que solo se dispara un único envío de notificación.
 - **FR-012**: El worker NO DEBE validar si el destinatario tiene el canal habilitado
   (ej. mail registrado, push suscripto); asume que el emisor del mensaje ya lo validó. Un
   fallo de envío por esta causa se trata como fallo técnico del proveedor.
+- **FR-013**: El worker DEBE validar de forma cruzada `canal` contra los campos de
+  contacto: si `canal = "mail"`, el campo `mail` DEBE estar presente y el campo
+  `push_sub` DEBE estar ausente; si `canal = "push"`, el campo `push_sub` DEBE estar
+  presente y el campo `mail` DEBE estar ausente. Cualquier combinación distinta se
+  trata como mensaje inválido (rechazo/dead-letter, ver FR-005).
+- **FR-014**: El worker NO DEBE incluir ni depender de ningún campo de "tipo de
+  evento" en el mensaje; ese concepto pertenece al dominio del algoritmo de
+  recomendación y es explícitamente ajeno a este repo (Principio I).
 
 ### Key Entities
 
 - **Mensaje de notificación**: Representa un pedido de envío ya decidido por otro
   componente del sistema. Esquema mínimo de trabajo para esta feature (sujeto a
   confirmación en el contrato externo — ver Principio III de la Constitution):
-  - `id_mensaje`: identificador único del mensaje, usado para detectar duplicados.
+  - `id_mensaje`: identificador único numérico del mensaje, usado para detectar
+    duplicados.
   - `canal`: `"push"` | `"mail"`.
-  - `destinatario`: identificador del destinatario (se asume ya resuelto/válido por el
-    emisor para el canal indicado).
+  - `destinatario`: identificador numérico del usuario, usado solo para
+    trazabilidad/logging (no es el dato de contacto en sí).
+  - `mail`: dirección de correo ya resuelta por el emisor; obligatoria si y solo si
+    `canal = "mail"` (FR-013).
+  - `push_sub`: Web Push Subscription ya resuelta por el emisor (objeto con
+    `endpoint`, `keys.p256dh`, `keys.auth`); obligatoria si y solo si
+    `canal = "push"` (FR-013).
   - `contenido`: datos necesarios para armar la notificación (se asume ya resuelto; el
     mecanismo de plantillas queda fuera de esta spec, ver Assumptions).
 - **Resultado de envío**: Representa el resultado de intentar entregar una notificación
@@ -253,13 +294,19 @@ veces y verificando que solo se dispara un único envío de notificación.
   definida, incluyendo configuración de dead-letter exchange y límite de entregas; el
   setup/infraestructura del broker en sí queda fuera de esta feature (se aborda en una
   feature posterior, según lo indicado por el usuario).
-- El esquema mínimo de trabajo (`canal`, `destinatario`, `contenido`, `id_mensaje`) es una
-  base para el plan técnico de esta feature; el contrato final y completo se validará
-  contra la documentación externa del repo "puerta de entrada" cuando esté disponible
-  (Principio III de la Constitution).
-- El worker confía en que el emisor del mensaje ya validó que el destinatario tiene el
-  canal indicado habilitado (mail registrado, push suscripto); el worker no repite esa
-  validación.
+- El esquema mínimo de trabajo (`id_mensaje`, `canal`, `destinatario`, `mail`,
+  `push_sub`, `contenido`) es una base para el plan técnico de esta feature; el
+  contrato final y completo se validará contra la documentación externa del repo
+  "puerta de entrada" cuando esté disponible (Principio III de la Constitution).
+- El worker confía en que el emisor del mensaje ya resolvió y validó el dato de
+  contacto correspondiente al canal (dirección de mail real, o Web Push Subscription
+  real del usuario); el worker no consulta ninguna base de datos para obtenerlos ni
+  para validar que el destinatario tenga el canal habilitado (Principio II).
+- El campo `destinatario` es el id numérico de usuario, usado exclusivamente para
+  trazabilidad/logging — no es el dato usado para efectuar el envío en sí (eso lo
+  hacen `mail` o `push_sub`, según corresponda).
+- Este mensaje no incluye ni depende de un "tipo de evento": ese concepto pertenece
+  al dominio del algoritmo de recomendación, ajeno a este repo (FR-014).
 - La política de reintentos ante fallo transitorio se apoya completamente en las
   capacidades nativas de RabbitMQ (requeue, TTL, dead-letter exchange); no hay lógica de
   reintento propia en el código del worker.

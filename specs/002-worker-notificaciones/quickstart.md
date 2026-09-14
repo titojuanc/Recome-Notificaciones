@@ -39,9 +39,33 @@ desde un script, publicar en la cola configurada un mensaje como:
 
 ```json
 {
-  "id_mensaje": "11111111-1111-1111-1111-111111111111",
+  "id_mensaje": 1001,
   "canal": "mail",
-  "destinatario": "usuario@ejemplo.com",
+  "destinatario": 42,
+  "mail": "usuario@ejemplo.com",
+  "push_sub": null,
+  "contenido": {
+    "titulo": "Nuevo lanzamiento recomendado",
+    "cuerpo": "Encontramos un juego que podría interesarte."
+  }
+}
+```
+
+O, para canal push:
+
+```json
+{
+  "id_mensaje": 1002,
+  "canal": "push",
+  "destinatario": 42,
+  "mail": null,
+  "push_sub": {
+    "endpoint": "https://fcm.googleapis.com/fcm/send/ejemplo-endpoint",
+    "keys": {
+      "p256dh": "clave-publica-base64",
+      "auth": "secreto-auth-base64"
+    }
+  },
   "contenido": {
     "titulo": "Nuevo lanzamiento recomendado",
     "cuerpo": "Encontramos un juego que podría interesarte."
@@ -62,6 +86,10 @@ descartarlo sin generar un segundo envío (ver `data-model.md` § 3).
 
 Publicar un mensaje sin `canal`, o con `canal: "sms"` (no soportado). El worker debe
 rechazarlo/enviarlo a dead-letter sin intentar ningún envío (FR-005).
+
+También se rechaza un mensaje con `canal: "mail"` que traiga `push_sub` (o le falte
+`mail`), o `canal: "push"` que traiga `mail` (o le falte `push_sub`) — validación
+cruzada estricta (FR-013).
 
 ## Correr tests
 

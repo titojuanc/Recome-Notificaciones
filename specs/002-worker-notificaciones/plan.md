@@ -10,19 +10,23 @@
 
 Worker Python que consume mensajes de una cola RabbitMQ dedicada a notificaciones,
 valida estrictamente cada mensaje contra un esquema mínimo (`id_mensaje`, `canal`,
-`destinatario`, `contenido`), enruta el envío al canal indicado (push o mail),
-descarta duplicados por `id_mensaje` vía un registro local (SQLite embebido, propio
-de este worker), y delega todo reintento ante fallo transitorio al mecanismo nativo
-de RabbitMQ (`nack`/requeue + dead-letter exchange), sin lógica de reintento propia.
-No implementa lógica de negocio de "cuándo" notificar ni resolución de plantillas
-(decisión de diseño pendiente, fuera de alcance).
+`destinatario`, `mail`, `push_sub`, `contenido`, con validación cruzada entre
+`canal` y los campos de contacto), enruta el envío al canal indicado (push o mail)
+usando el dato de contacto ya resuelto en el propio mensaje (sin consultar ninguna
+BDD ajena), descarta duplicados por `id_mensaje` vía un registro local (SQLite
+embebido, propio de este worker), y delega todo reintento ante fallo transitorio al
+mecanismo nativo de RabbitMQ (`nack`/requeue + dead-letter exchange), sin lógica de
+reintento propia. No implementa lógica de negocio de "cuándo" notificar, resolución
+de plantillas, ni ningún campo de "tipo de evento" (decisiones fuera de alcance).
 
 ## Technical Context
 
 **Language/Version**: Python 3.11
 
 **Primary Dependencies**: `pika` (cliente RabbitMQ), `pydantic` v2 (validación
-estricta de payload contra el esquema mínimo), `pytest` + `pytest-mock` (tests)
+estricta de payload, incluyendo validación cruzada `canal`/`mail`/`push_sub`),
+`pywebpush` (cliente Web Push real contra el `push_sub` del mensaje), `pytest` +
+`pytest-mock` (tests)
 
 **Storage**: SQLite embebido (archivo local del worker) exclusivamente para el
 registro de `id_mensaje` ya procesados (deduplicación); no es una base de datos de

@@ -12,17 +12,36 @@ Representa el payload recibido desde la cola de RabbitMQ. Corresponde a la entid
 
 | Campo | Tipo | Obligatorio | Descripción |
 |-------|------|-------------|-------------|
-| `id_mensaje` | `str` (UUID o string único) | Sí | Identificador único del mensaje; usado para deduplicación (FR-011). |
+| `id_mensaje` | `int` | Sí | Identificador único numérico del mensaje; usado para deduplicación (FR-011). |
 | `canal` | `Literal["push", "mail"]` | Sí | Canal de envío. Cualquier otro valor es inválido (FR-005). |
-| `destinatario` | `str` | Sí | Identificador del destinatario para el canal indicado (ej. token push, dirección mail). Se asume ya validado por el emisor (FR-012). |
-| `contenido` | `dict` / modelo anidado `Contenido` | Sí | Datos necesarios para armar la notificación. Estructura exacta pendiente del contrato externo (Principio III); en esta iteración se valida como mínimo `titulo: str` y `cuerpo: str`. |
+| `destinatario` | `int` | Sí | Id numérico del usuario. Usado solo para trazabilidad/logging — no es el dato de contacto real usado para enviar. |
+| `mail` | `str \| None` | Condicional | Dirección de correo ya resuelta por el emisor. Obligatorio si y solo si `canal = "mail"`; debe estar ausente/`None` si `canal = "push"` (FR-013). |
+| `push_sub` | `PushSubscription \| None` | Condicional | Web Push Subscription ya resuelta por el emisor. Obligatorio si y solo si `canal = "push"`; debe estar ausente/`None` si `canal = "mail"` (FR-013). |
+| `contenido` | `Contenido` (modelo anidado) | Sí | Datos necesarios para armar la notificación. Estructura exacta pendiente del contrato externo (Principio III); en esta iteración se valida como mínimo `titulo: str` y `cuerpo: str`. |
+
+### Submodelo `PushSubscription`
+
+Formato estándar de Web Push Subscription del navegador:
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|-------------|-------------|
+| `endpoint` | `str` | Sí | URL del servicio push del navegador (FCM, Mozilla, etc.). |
+| `keys.p256dh` | `str` | Sí | Clave pública de cifrado, base64. |
+| `keys.auth` | `str` | Sí | Secreto de autenticación, base64. |
 
 **Reglas de validación**:
-- Modelo con `extra="forbid"`: cualquier campo no declarado provoca error de
-  validación (rechazo del mensaje, FR-005 / Principio IV).
+- Modelo con `extra="forbid"` (a todos los niveles, incluido `push_sub` y
+  `contenido`): cualquier campo no declarado provoca error de validación (rechazo del
+  mensaje, FR-005 / Principio IV).
 - Ningún campo tiene valor por defecto que "invente" datos faltantes.
 - `canal` se valida contra un enum cerrado (`push` | `mail`); cualquier otro string
   es rechazado.
+- **Validación cruzada (model validator)**: si `canal = "mail"` → `mail` debe estar
+  presente (no `None`) y `push_sub` debe ser `None`; si `canal = "push"` → `push_sub`
+  debe estar presente (no `None`) y `mail` debe ser `None`. Cualquier otra
+  combinación falla la validación (FR-013).
+- El mensaje **no** incluye ni valida ningún campo de "tipo de evento" (FR-014) — ese
+  concepto es ajeno a este repo.
 
 **Transiciones de estado** (no es una entidad persistida, es el payload de entrada):
 `recibido` → `validado` → (`duplicado` | `enviado` | `rechazado` | `reencolado`)
@@ -34,7 +53,7 @@ Corresponde a la entidad "Resultado de envío" de `spec.md`.
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `id_mensaje` | `str` | Referencia al mensaje procesado. |
+| `id_mensaje` | `int` | Referencia al mensaje procesado. |
 | `estado` | `Literal["exitoso", "fallo_transitorio", "fallo_definitivo"]` | Resultado del intento de envío. |
 | `canal` | `Literal["push", "mail"]` | Canal por el que se intentó el envío. |
 | `detalle` | `str \| None` | Mensaje de error o detalle técnico, si aplica (para logging, FR-008). |
@@ -56,7 +75,7 @@ Mecanismo de idempotencia (entidad "Registro de mensajes procesados" de `spec.md
 
 | Columna | Tipo SQL | Constraint | Descripción |
 |---------|----------|------------|-------------|
-| `id_mensaje` | `TEXT` | `PRIMARY KEY` | Identificador único del mensaje ya procesado exitosamente. |
+| `id_mensaje` | `INTEGER` | `PRIMARY KEY` | Identificador único numérico del mensaje ya procesado exitosamente. |
 | `processed_at` | `TIMESTAMP` | `NOT NULL DEFAULT CURRENT_TIMESTAMP` | Momento en que se confirmó el envío exitoso. |
 | `canal` | `TEXT` | `NOT NULL` | Canal por el que se envió (para trazabilidad/debug). |
 

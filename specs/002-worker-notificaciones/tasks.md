@@ -33,7 +33,8 @@ Proyecto único (single project), según `plan.md`:
 - [ ] T001 Crear estructura de carpetas `src/{models,services/canales,consumer}` y
       `tests/{unit,integration,contract}` según `plan.md`
 - [ ] T002 Inicializar proyecto Python 3.11 con `pyproject.toml`/`requirements.txt`:
-      `pika`, `pydantic>=2`, `pytest`, `pytest-mock`
+      `pika`, `pydantic>=2`, `pydantic[email]` (validación de `mail`), `pywebpush`
+      (cliente Web Push real para `push_sub`), `pytest`, `pytest-mock`
 - [ ] T003 [P] Configurar linting/formatting (`ruff` o `flake8` + `black`)
 - [ ] T004 [P] Crear `docker-compose.test.yml` con RabbitMQ (`rabbitmq:3-management`)
       para integration/contract tests, según `quickstart.md`
@@ -49,7 +50,9 @@ poder implementarse
 
 **⚠️ CRITICAL**: Ninguna user story puede comenzar hasta completar esta fase
 
-- [ ] T006 🟢 Crear modelo `MensajeNotificacion` (pydantic, `extra="forbid"`) en
+- [ ] T006 🟢 Crear modelos `MensajeNotificacion`, `PushSubscription` y `Contenido`
+      (pydantic, `extra="forbid"` en todos los niveles) con validador de modelo para
+      la validación cruzada `canal`/`mail`/`push_sub` (FR-013), en
       `src/models/mensaje.py` según `data-model.md` §1 y
       `contracts/mensaje-notificacion.schema.json`
 - [ ] T007 [P] 🟢 Crear modelo `ResultadoEnvio` en `src/models/resultado.py` según
@@ -88,9 +91,11 @@ verificar que se dispara el envío correcto y se hace `ack`.
 ### Implementation for User Story 1
 
 - [ ] T015 [P] [US1] Implementar `src/services/canales/push.py` (adaptador de envío
-      push; interfaz simple `enviar(destinatario, contenido) -> ResultadoEnvio`)
+      push vía `pywebpush` usando el objeto `push_sub` (endpoint + keys) del
+      mensaje; interfaz simple `enviar(push_sub, contenido) -> ResultadoEnvio`)
 - [ ] T016 [P] [US1] Implementar `src/services/canales/mail.py` (adaptador de envío
-      mail; misma interfaz)
+      mail usando el campo `mail` del mensaje; interfaz simple
+      `enviar(mail, contenido) -> ResultadoEnvio`)
 - [ ] T017 [US1] Implementar `src/services/enrutador.py`: dado un `MensajeNotificacion`,
       selecciona el cliente de canal correspondiente (depende de T015, T016)
 - [ ] T018 [US1] Implementar `src/consumer/worker.py`: conexión `pika`
@@ -123,6 +128,11 @@ dead-letter/rechazo.
 - [ ] T022 [US2] 🟢 Unit test: `MensajeNotificacion` rechaza payload con campo
       extra no declarado (`extra="forbid"`) en el mismo archivo (secuencial respecto
       a T020/T021)
+- [ ] T022b [US2] 🟢 Unit test: validación cruzada `canal`/`mail`/`push_sub`
+      (FR-013) — casos: `canal="mail"` sin `mail`, `canal="mail"` con `push_sub`
+      presente, `canal="push"` sin `push_sub`, `canal="push"` con `mail` presente;
+      los 4 casos deben ser rechazados, en el mismo archivo (secuencial respecto a
+      T020/T021/T022)
 - [ ] T023 [US2] 🔴 Contract/integration test: mensaje inválido publicado en cola real
       termina en dead-letter sin generar envío, en
       `tests/contract/test_consumer_mensaje_invalido.py` (depende de T014 como base)
@@ -318,7 +328,7 @@ Task: "Implementar src/services/canales/mail.py"
 
 ### Aplicación del rigor TDD por tarea (Principio VI de la Constitution)
 
-- 🟢 **TDD estricto** (T006, T007, T010, T011, T020, T021, T022, T027): ciclo
+- 🟢 **TDD estricto** (T006, T007, T010, T011, T020, T021, T022, T022b, T027): ciclo
   red-green-refactor completo, sin mocks de infraestructura pesada.
 - 🟡 **Test-first de integración** (T012, T013, T032): interfaz mock-first + test de
   integración contra el cliente del proveedor (real o sandbox).
