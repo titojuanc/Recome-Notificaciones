@@ -80,22 +80,21 @@ echo "--- duplicado (mismo id_mensaje publicado dos veces) ---"
 sleep 2
 
 echo
+echo "--- push (sin VAPID real; falla, se reintenta hasta agotar RABBITMQ_DELIVERY_LIMIT y va a dead-letter) ---"
+"$VENV_PY" scripts/publicar_prueba.py push
+echo "Esperando a que se agoten los reintentos (x-delivery-limit) y el mensaje pase a dead-letter..."
+sleep 6
+
+echo
 echo "== 4. Resultado (últimas líneas de worker.log) =="
-tail -n 20 "$WORKER_LOG"
+tail -n 30 "$WORKER_LOG"
 
 echo
 echo "== Listo =="
-echo "Revisá también Mailpit en http://localhost:8025 para ver el mail entregado."
+echo "Revisá también:"
+echo "  - Mailpit (http://localhost:8025) para ver el mail entregado."
+echo "  - RabbitMQ (http://localhost:15672 -> Queues and Streams -> notificaciones.dead-letter)"
+echo "    para ver el mensaje push que agotó sus reintentos."
 echo "El worker sigue corriendo en background (PID $(cat "$WORKER_PID_FILE")). Para detenerlo:"
 echo "  kill \$(cat worker.pid)"
-echo
-echo "NOTA sobre 'push': no se incluye en esta prueba automática porque, sin"
-echo "credenciales VAPID reales configuradas (.env), el envío falla de verdad y"
-echo "RabbitMQ lo reencola en un loop indefinido (no hay límite de entregas"
-echo "configurado en esta iteración, ver quickstart.md). Para probarlo manualmente"
-echo "(y ver el comportamiento de reencolado nativo), corré en otra terminal:"
-echo "  .venv/bin/python scripts/publicar_prueba.py push"
-echo "y mirá el log reintentar. Cuando termines, purgá la cola para no dejarlo"
-echo "reintentando indefinidamente:"
-echo "  .venv/bin/python -c \"import pika; c=pika.BlockingConnection(pika.URLParameters('amqp://guest:guest@localhost:5672/')); ch=c.channel(); ch.queue_purge(queue='notificaciones'); c.close()\""
 

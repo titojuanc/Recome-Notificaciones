@@ -139,6 +139,40 @@ exploratorio en `quickstart.md`, no como parte de la suite de tests de CI.
 por complejidad desproporcionada para el beneficio (Principio VII); no hay
 herramienta estándar madura para esto en el ecosistema.
 
+## 8. Límite de reintentos y TTL de la cola (evitar reintento/vida indefinida)
+
+**Decisión**: La cola principal (`RABBITMQ_QUEUE_NOTIFICACIONES`) se declara como
+cola **quorum** (`x-queue-type: quorum`) con dos límites configurables:
+- `x-delivery-limit` (`RABBITMQ_DELIVERY_LIMIT`, default `5`): cantidad de
+  reentregas permitidas ante `nack(requeue=True)` antes de mandar el mensaje a la
+  dead-letter exchange automáticamente.
+- `x-message-ttl` (`RABBITMQ_MESSAGE_TTL_MS`, default 24hs): tiempo máximo que un
+  mensaje puede esperar sin ser consumido antes de ir a dead-letter.
+
+**Racional**: sin estos límites, un mensaje con fallo transitorio persistente (ej.
+un proveedor caído, o —como se observó en pruebas manuales— un `push_sub` de
+prueba sin credenciales VAPID reales) se reencola **indefinidamente**, sin backoff
+ni corte, generando carga innecesaria de forma perpetua y pudiendo degradar el
+sistema. Las colas *quorum* de RabbitMQ soportan nativamente `x-delivery-limit`
+(no disponible en colas clásicas), por lo que se eligió ese tipo de cola en vez de
+mantener la cola clásica original.
+
+**Alternativas consideradas**:
+- **No configurar límite** (diseño original de esta feature): rechazado tras
+  observar en pruebas manuales que genera un loop de reintento infinito ante un
+  fallo persistente — riesgo de colapso operativo, inaceptable (Principio VII no
+  justifica omitir un control de esta naturaleza).
+- **Backoff exponencial propio en el worker**: rechazado — implica lógica de
+  reintento propia, que contradice la decisión ya tomada (Clarifications de
+  `spec.md`) de delegar el reintento enteramente a RabbitMQ.
+- **Límite fijo hardcodeado sin variable de entorno**: rechazado por Principio
+  VII/flexibilidad operativa — distintos entornos pueden necesitar valores
+  distintos sin requerir un cambio de código.
+
+**Nota de contract testing**: `tests/contract/test_consumer_reencolado.py` incluye
+un test (T034) que fuerza un fallo persistente y verifica que, tras agotar el
+límite configurado, el mensaje aparece efectivamente en la dead-letter queue.
+
 ## Resumen de decisiones para `plan.md`
 
 | Aspecto | Resuelto como |
@@ -150,6 +184,7 @@ herramienta estándar madura para esto en el ecosistema.
 | Integration testing (RabbitMQ) | RabbitMQ real vía Docker en CI/local (`recome-rabbitmq`) |
 | Integration testing (mail) | Mailpit (SMTP falso) vía Docker (`recome-mailpit`) |
 | Integration testing (push) | Mock de `pywebpush`; validación manual real como paso exploratorio complementario |
+| Límite de reintentos / TTL | Cola quorum + `x-delivery-limit` (default 5) + `x-message-ttl` (default 24hs), ambos configurables por entorno |
 
 Todas las incógnitas de `plan.md` quedan resueltas; no quedan `NEEDS CLARIFICATION`
 pendientes para avanzar a Phase 1 (data-model, contracts, quickstart).

@@ -137,24 +137,36 @@ pytest tests/integration   # 🟡 clientes push/mail (mockeados o sandbox real)
 pytest tests/contract      # 🔴 contra el schema de contracts/ + RabbitMQ real (Docker)
 ```
 
-## Dead-letter exchange
+## Dead-letter exchange, límite de reintentos y TTL
 
 El worker declara, para la cola configurada (`RABBITMQ_QUEUE_NOTIFICACIONES`), un
-exchange `<queue>.dlx` (fanout) enlazado a una cola `<queue>.dead-letter`, y declara
-la cola principal con el argumento `x-dead-letter-exchange` apuntando a ese exchange
-(ver `src/consumer/worker.py`, método `run`). Así:
+exchange `<queue>.dlx` (fanout) enlazado a una cola `<queue>.dead-letter`. La cola
+principal se declara como **quorum** (`x-queue-type: quorum`), con dos límites que
+evitan que un mensaje viva o se reintente indefinidamente:
 
-- Un mensaje rechazado por el worker (`nack(requeue=False)`, ej. payload inválido)
-  termina en `<queue>.dead-letter` automáticamente.
-- Un mensaje con fallo transitorio (`nack(requeue=True)`) es reencolado por
-  RabbitMQ en la cola principal (comportamiento nativo, sin lógica de reintento
-  propia del worker).
+- **`x-delivery-limit`** (`RABBITMQ_DELIVERY_LIMIT`, default `5`): cantidad máxima
+  de veces que RabbitMQ vuelve a entregar un mensaje reencolado (`nack(requeue=True)`)
+  antes de mandarlo automáticamente a la dead-letter exchange.
+- **`x-message-ttl`** (`RABBITMQ_MESSAGE_TTL_MS`, default `86400000` = 24hs): tiempo
+  máximo que un mensaje puede permanecer en la cola sin ser consumido; al vencer,
+  también se manda a la dead-letter exchange.
 
-**Limitación conocida**: esta iteración no configura un límite de entregas
-(`x-delivery-limit`, disponible en colas quorum) para forzar el paso automático a
-dead-letter tras N reintentos — un mensaje con fallo transitorio persistente se
-reencola indefinidamente salvo que el proveedor deje de fallar. Se documenta como
-mejora futura si se requiere ese límite.
+Ver `src/consumer/worker.py`, método `run`, y `src/config.py`.
+
+Con esto:
+
+- Un mensaje **rechazado explícitamente** por el worker (`nack(requeue=False)`, ej.
+  payload inválido) termina en `<queue>.dead-letter` de inmediato.
+- Un mensaje con **fallo transitorio** (`nack(requeue=True)`) es reencolado por
+  RabbitMQ hasta `RABBITMQ_DELIVERY_LIMIT` veces; al agotar el límite, termina en
+  `<queue>.dead-letter` en vez de reintentarse para siempre.
+- Un mensaje que queda **más de `RABBITMQ_MESSAGE_TTL_MS`** sin poder procesarse
+  (ej. el worker estuvo caído) se descarta a dead-letter en vez de acumularse
+  indefinidamente en la cola principal.
+
+Esto evita el escenario observado en pruebas manuales (ver
+`docs/PRUEBAS_MANUALES.md`) donde un mensaje `push` sin credenciales VAPID reales
+generaba un loop de reintento infinito.
 
 ## Limitaciones conocidas de esta iteración
 

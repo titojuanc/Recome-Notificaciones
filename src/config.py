@@ -19,6 +19,8 @@ class Config:
     rabbitmq_url: str
     rabbitmq_queue: str
     rabbitmq_prefetch_count: int
+    rabbitmq_delivery_limit: int
+    rabbitmq_message_ttl_ms: int
     sqlite_dedup_path: str
     smtp_host: str
     smtp_port: int
@@ -33,6 +35,14 @@ class Config:
             rabbitmq_url=os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
             rabbitmq_queue=os.environ.get("RABBITMQ_QUEUE_NOTIFICACIONES", "notificaciones"),
             rabbitmq_prefetch_count=_get_int("RABBITMQ_PREFETCH_COUNT", 10),
+            # Límite de reintentos (requiere cola tipo quorum, ver worker.py):
+            # tras agotar estas entregas, el mensaje se manda a dead-letter en
+            # vez de reencolarse indefinidamente (ver quickstart.md).
+            rabbitmq_delivery_limit=_get_int("RABBITMQ_DELIVERY_LIMIT", 5),
+            # TTL en milisegundos: un mensaje que lleva más de este tiempo sin
+            # poder ser procesado se descarta (va a dead-letter) en vez de
+            # vivir indefinidamente en la cola. Default: 24hs.
+            rabbitmq_message_ttl_ms=_get_int("RABBITMQ_MESSAGE_TTL_MS", 24 * 60 * 60 * 1000),
             sqlite_dedup_path=os.environ.get(
                 "SQLITE_DEDUP_PATH", "data/processed_messages.db"
             ),
