@@ -28,6 +28,8 @@ class Config:
     vapid_private_key: str
     vapid_public_key: str
     vapid_claims_sub: str
+    service_api_key: str
+    callback_timeout_seconds: int
 
     @classmethod
     def from_env(cls) -> Config:
@@ -52,4 +54,9 @@ class Config:
             vapid_private_key=os.environ.get("VAPID_PRIVATE_KEY", ""),
             vapid_public_key=os.environ.get("VAPID_PUBLIC_KEY", ""),
             vapid_claims_sub=os.environ.get("VAPID_CLAIMS_SUB", "mailto:admin@recome.local"),
+            # Clave compartida con recome-api-general (header X-Service-Api-Key)
+            # usada para autenticar el callback de confirmación de envío de mail
+            # (ver ReporteInternalController / ServiceApiKeyFilter en ese repo).
+            service_api_key=os.environ.get("RECOMMENDATIONS_SERVICE_API_KEY", ""),
+            callback_timeout_seconds=_get_int("CALLBACK_TIMEOUT_SECONDS", 5),
         )

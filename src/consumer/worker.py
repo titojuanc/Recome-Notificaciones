@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from src.config import Config
 from src.logging_config import configurar_logging, log_evento
 from src.models.mensaje import MensajeNotificacion
+from src.services.callback import confirmar_envio
 from src.services.canales.mail import ClienteMail
 from src.services.canales.push import ClientePush
 from src.services.dedup import RegistroMensajeProcesado
@@ -63,6 +64,19 @@ class Worker:
         if resultado.estado == "exitoso":
             self._dedup.registrar(mensaje.id_mensaje, mensaje.canal)
             log_evento(self._logger, "enviado", id_mensaje=mensaje.id_mensaje, canal=mensaje.canal)
+            if mensaje.callback_url:
+                exito_callback = confirmar_envio(
+                    mensaje.callback_url,
+                    self._config.service_api_key,
+                    self._config.callback_timeout_seconds,
+                    self._logger,
+                )
+                log_evento(
+                    self._logger,
+                    "callback_confirmado" if exito_callback else "callback_fallido",
+                    id_mensaje=mensaje.id_mensaje,
+                    canal=mensaje.canal,
+                )
             return "ack", mensaje
 
         if resultado.estado == "fallo_transitorio":

@@ -89,7 +89,7 @@ def test_mensaje_con_fallo_transitorio_se_reencola(worker):
     llamadas = {"n": 0}
     enviar_original = worker._cliente_mail.enviar
 
-    def enviar_mock(mail, contenido):
+    def enviar_mock(mail, contenido, adjunto=None):
         llamadas["n"] += 1
         if llamadas["n"] == 1:
             from src.models.resultado import ResultadoEnvio

@@ -30,6 +30,19 @@ class Contenido(BaseModel):
     cuerpo: str
 
 
+class Adjunto(BaseModel):
+    """Archivo adjunto opcional para el canal mail (ver 'adjunto' en
+    MensajeNotificacion). Agregado para e2e-local: api-general descarga el
+    reporte desde la URL firmada de MinIO y lo manda en base64 acá, para que
+    el worker lo adjunte directamente al mail sin depender de un link externo."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    nombre_archivo: str
+    content_type: str
+    contenido_base64: str
+
+
 class MensajeNotificacion(BaseModel):
     """Payload consumido desde la cola de RabbitMQ.
 
@@ -45,6 +58,12 @@ class MensajeNotificacion(BaseModel):
     mail: EmailStr | None = None
     push_sub: PushSubscription | None = None
     contenido: Contenido
+    adjunto: Adjunto | None = None
+    """Adjunto opcional para el canal 'mail' (ver clase Adjunto)."""
+    callback_url: str | None = None
+    """URL interna (api-general) a la que se hace POST tras enviar el mail
+    con éxito, para cerrar el loop de feedback (US: reporte de anuncio).
+    Opcional: si no viene, no se intenta ningún callback."""
 
     @model_validator(mode="after")
     def validar_canal_contacto(self) -> MensajeNotificacion:

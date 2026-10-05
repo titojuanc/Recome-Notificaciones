@@ -9,7 +9,7 @@ def enrutar(mensaje: MensajeNotificacion, cliente_push, cliente_mail) -> Resulta
     if mensaje.canal == "push":
         resultado = cliente_push.enviar(mensaje.push_sub, mensaje.contenido)
     else:
-        resultado = cliente_mail.enviar(mensaje.mail, mensaje.contenido)
+        resultado = cliente_mail.enviar(mensaje.mail, mensaje.contenido, mensaje.adjunto)
 
     # Aseguramos que el id_mensaje/canal del resultado reflejen el mensaje real.
     return resultado.model_copy(update={"id_mensaje": mensaje.id_mensaje, "canal": mensaje.canal})
