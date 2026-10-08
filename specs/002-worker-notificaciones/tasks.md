@@ -221,10 +221,12 @@ eventualmente entregado, o agota el límite de entregas y termina en dead-letter
 
 ### Implementation for User Story 3
 
-- [x] T035 [US3] Configurar la cola de notificaciones en `docker-compose.test.yml`
-      (o script de setup) con `x-dead-letter-exchange` y límite de entregas
-      (`x-delivery-limit` o patrón de conteo vía header), según `research.md` (depende
-      de T004)
+- [x] T035 [US3] Configurar la cola de notificaciones (vía `src/consumer/worker.py`,
+      método `run`, declarada como cola *quorum*) con `x-dead-letter-exchange`,
+      `x-delivery-limit` (`RABBITMQ_DELIVERY_LIMIT`, default 5) y `x-message-ttl`
+      (`RABBITMQ_MESSAGE_TTL_MS`, default 24hs), según `research.md` §8 (depende
+      de T004). Verificado con T034: tras agotar el límite, el mensaje termina en
+      la dead-letter queue en vez de reencolarse indefinidamente.
 - [x] T036 [US3] Extender `src/consumer/worker.py`: capturar excepción de envío del
       proveedor (distinta de error de validación) y hacer
       `nack(requeue=True)` sin lógica de reintento propia (depende de T018, T024)

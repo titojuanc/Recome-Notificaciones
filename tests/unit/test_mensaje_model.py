@@ -120,3 +120,18 @@ def test_rechaza_mail_formato_invalido():
     payload["mail"] = "no-es-un-mail"
     with pytest.raises(ValidationError):
         MensajeNotificacion.model_validate(payload)
+
+
+# --- callback_url opcional (Spec 4: loop de feedback con recome-api-general) ---
+
+
+def test_callback_url_ausente_por_defecto_es_none():
+    msg = MensajeNotificacion.model_validate(MENSAJE_MAIL_VALIDO)
+    assert msg.callback_url is None
+
+
+def test_callback_url_presente_se_conserva():
+    payload = dict(MENSAJE_MAIL_VALIDO)
+    payload["callback_url"] = "http://localhost:8080/api/v1/internal/reportes/abc/notificado"
+    msg = MensajeNotificacion.model_validate(payload)
+    assert msg.callback_url == payload["callback_url"]

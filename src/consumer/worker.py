@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from src.config import Config
 from src.logging_config import configurar_logging, log_evento
 from src.models.mensaje import MensajeNotificacion
+from src.services.callback import confirmar_envio
 from src.services.canales.mail import ClienteMail
 from src.services.canales.push import ClientePush
 from src.services.dedup import RegistroMensajeProcesado
@@ -63,6 +64,19 @@ class Worker:
         if resultado.estado == "exitoso":
             self._dedup.registrar(mensaje.id_mensaje, mensaje.canal)
             log_evento(self._logger, "enviado", id_mensaje=mensaje.id_mensaje, canal=mensaje.canal)
+            if mensaje.callback_url:
+                exito_callback = confirmar_envio(
+                    mensaje.callback_url,
+                    self._config.service_api_key,
+                    self._config.callback_timeout_seconds,
+                    self._logger,
+                )
+                log_evento(
+                    self._logger,
+                    "callback_confirmado" if exito_callback else "callback_fallido",
+                    id_mensaje=mensaje.id_mensaje,
+                    canal=mensaje.canal,
+                )
             return "ack", mensaje
 
         if resultado.estado == "fallo_transitorio":
@@ -99,18 +113,29 @@ class Worker:
         canal = conexion.channel()
 
         # Dead-letter exchange/queue (US2/US3, FR-007): mensajes rechazados
-        # (nack sin requeue) o que agotan el límite de entregas terminan acá,
-        # en vez de perderse. Ver quickstart.md y research.md.
+        # (nack sin requeue), que agotan el límite de entregas, o que exceden
+        # el TTL configurado terminan acá, en vez de perderse o vivir/
+        # reintentarse indefinidamente. Ver quickstart.md y research.md.
         dlx_name = f"{self._config.rabbitmq_queue}.dlx"
         dlq_name = f"{self._config.rabbitmq_queue}.dead-letter"
         canal.exchange_declare(exchange=dlx_name, exchange_type="fanout", durable=True)
         canal.queue_declare(queue=dlq_name, durable=True)
         canal.queue_bind(queue=dlq_name, exchange=dlx_name)
 
+        # Cola tipo quorum (requerido por RabbitMQ para poder usar
+        # x-delivery-limit): tras agotar RABBITMQ_DELIVERY_LIMIT reintentos de
+        # un fallo transitorio, o tras RABBITMQ_MESSAGE_TTL_MS sin poder
+        # procesarse, el mensaje se manda a la dead-letter exchange en vez de
+        # reencolarse/vivir para siempre (evita colapsar el sistema).
         canal.queue_declare(
             queue=self._config.rabbitmq_queue,
             durable=True,
-            arguments={"x-dead-letter-exchange": dlx_name},
+            arguments={
+                "x-queue-type": "quorum",
+                "x-dead-letter-exchange": dlx_name,
+                "x-delivery-limit": self._config.rabbitmq_delivery_limit,
+                "x-message-ttl": self._config.rabbitmq_message_ttl_ms,
+            },
         )
         canal.basic_qos(prefetch_count=self._config.rabbitmq_prefetch_count)
         canal.basic_consume(

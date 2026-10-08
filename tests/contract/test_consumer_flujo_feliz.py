@@ -6,6 +6,7 @@ Requiere RabbitMQ corriendo (docker-compose.test.yml o contenedor manual
 import json
 import time
 import uuid
+from dataclasses import replace
 
 import pika
 import pytest
@@ -73,9 +74,8 @@ def _consumir_uno(queue: str, worker: Worker, timeout: float = 5.0) -> str:
 
 @pytest.fixture()
 def worker(tmp_path):
-    config = Config.from_env()
-    config = Config(
-        rabbitmq_url=config.rabbitmq_url,
+    config = replace(
+        Config.from_env(),
         rabbitmq_queue=f"test-notificaciones-{uuid.uuid4().hex[:8]}",
         rabbitmq_prefetch_count=1,
         sqlite_dedup_path=str(tmp_path / "dedup.db"),

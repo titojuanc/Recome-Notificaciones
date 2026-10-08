@@ -7,10 +7,11 @@ producción, según configuración (SMTP_HOST/SMTP_PORT).
 """
 from __future__ import annotations
 
+import base64
 import smtplib
 from email.message import EmailMessage
 
-from src.models.mensaje import Contenido
+from src.models.mensaje import Adjunto, Contenido
 from src.models.resultado import ResultadoEnvio
 
 
@@ -20,12 +21,23 @@ class ClienteMail:
         self._smtp_port = smtp_port
         self._smtp_from = smtp_from
 
-    def enviar(self, mail: str, contenido: Contenido) -> ResultadoEnvio:
+    def enviar(
+        self, mail: str, contenido: Contenido, adjunto: Adjunto | None = None
+    ) -> ResultadoEnvio:
         msg = EmailMessage()
         msg["From"] = self._smtp_from
         msg["To"] = mail
         msg["Subject"] = contenido.titulo
         msg.set_content(contenido.cuerpo)
+
+        if adjunto is not None:
+            maintype, _, subtype = adjunto.content_type.partition("/")
+            msg.add_attachment(
+                base64.b64decode(adjunto.contenido_base64),
+                maintype=maintype or "application",
+                subtype=subtype or "octet-stream",
+                filename=adjunto.nombre_archivo,
+            )
 
         try:
             with smtplib.SMTP(self._smtp_host, self._smtp_port, timeout=5) as smtp:

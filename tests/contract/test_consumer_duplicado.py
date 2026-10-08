@@ -3,6 +3,7 @@
 import json
 import time
 import uuid
+from dataclasses import replace
 
 import pika
 import pytest
@@ -63,7 +64,8 @@ def _consumir_uno(queue: str, worker: Worker, timeout: float = 5.0) -> str:
 
 @pytest.fixture()
 def worker(tmp_path):
-    config = Config(
+    config = replace(
+        Config.from_env(),
         rabbitmq_url=RABBITMQ_URL,
         rabbitmq_queue=f"test-duplicados-{uuid.uuid4().hex[:8]}",
         rabbitmq_prefetch_count=1,

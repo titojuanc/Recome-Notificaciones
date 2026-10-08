@@ -28,10 +28,9 @@ Este script:
 1. Levanta RabbitMQ y Mailpit si no están corriendo (`docker-compose.test.yml`).
 2. Arranca el worker en background si no está corriendo (log en `worker.log`,
    PID guardado en `worker.pid`).
-3. Publica, uno por uno, los 4 casos de prueba "seguros" (mail válido, mensaje
-   inválido, canal no soportado, duplicado). El caso `push` se deja aparte
-   (ver más abajo) porque sin credenciales VAPID reales reintenta
-   indefinidamente y ensucia la demo.
+3. Publica, uno por uno, los 5 casos de prueba (mail válido, push que agota
+   reintentos y va a dead-letter, mensaje inválido, canal no soportado,
+   duplicado).
 4. Muestra el resultado en el log del worker.
 
 Al final, revisá:
@@ -111,39 +110,22 @@ http://localhost:15672 → **Queues and Streams** → `notificaciones` →
 | Mensaje inválido | `publicar_prueba.py invalido` | `evento=rechazado` (sin canal ni destino) | — |
 | Canal no soportado | `publicar_prueba.py canal-no-soportado` | `evento=rechazado` | — |
 | Duplicado | `publicar_prueba.py duplicado` | 1ra vez `evento=enviado`, 2da vez `evento=duplicado_descartado` | Mailpit solo tiene 1 mail, no 2 |
-| Push (ver nota abajo) | `publicar_prueba.py push` | `evento=reencolado canal=push` **repetido indefinidamente** | — |
+| Push (ver nota abajo) | `publicar_prueba.py push` | `evento=reencolado` repetido hasta `RABBITMQ_DELIVERY_LIMIT` veces (default 5), y luego `evento=dead_letter` | Cola `notificaciones.dead-letter` en RabbitMQ (http://localhost:15672) |
 
-**⚠️ Nota importante sobre `push`**: no existe un equivalente a Mailpit para Web
-Push (ver `research.md` §7), y esta iteración **no configura un límite de
-entregas** (`x-delivery-limit`) para la cola — es una limitación conocida,
-documentada en `quickstart.md`. Como consecuencia, publicar un mensaje `push`
-con un `push_sub` de prueba (o sin `VAPID_PRIVATE_KEY` configurada) hace que
-`pywebpush` falle de verdad, y el worker lo reencola en un **loop indefinido**
-(reintenta para siempre, sin backoff propio — por diseño, el worker delega
-todo el reintento a RabbitMQ). Por eso:
+**Nota sobre `push`**: no existe un equivalente a Mailpit para Web Push (ver
+`research.md` §7). Publicar un mensaje `push` con un `push_sub` de prueba (o sin
+`VAPID_PRIVATE_KEY` real configurada) hace que `pywebpush` falle de verdad, y el
+worker lo reencola (`evento=reencolado`). Gracias al límite de reintentos
+(`x-delivery-limit`, ver `quickstart.md`), esto **ya no es un loop infinito**:
+tras `RABBITMQ_DELIVERY_LIMIT` intentos (default `5`), RabbitMQ manda el mensaje
+automáticamente a `notificaciones.dead-letter` y deja de reintentarlo. Podés
+verlo en la consola de RabbitMQ (http://localhost:15672 → Queues and Streams →
+`notificaciones.dead-letter`).
 
-- El script `ejecutar_prueba_manual.sh` **no incluye el caso `push`** en su
-  corrida automática.
-- Si querés probarlo igual (para ver el comportamiento de reencolado nativo en
-  acción), corré en otra terminal:
-  ```bash
-  .venv/bin/python scripts/publicar_prueba.py push
-  tail -f worker.log   # vas a ver 'evento=reencolado' repetirse sin parar
-  ```
-- Cuando termines de observarlo, **purgá la cola** para no dejarlo reintentando
-  para siempre:
-  ```bash
-  .venv/bin/python -c "
-  import pika
-  c = pika.BlockingConnection(pika.URLParameters('amqp://guest:guest@localhost:5672/'))
-  c.channel().queue_purge(queue='notificaciones')
-  c.close()
-  "
-  ```
-- Para probar un push que efectivamente se entregue (`evento=enviado`), hace
-  falta configurar `VAPID_PRIVATE_KEY`/`VAPID_PUBLIC_KEY` reales en `.env` y
-  usar un `push_sub` de una Web Push Subscription real generada desde un
-  navegador — queda fuera del alcance de esta guía de pruebas rápidas.
+Para probar un push que efectivamente se entregue (`evento=enviado`), hace falta
+configurar `VAPID_PRIVATE_KEY`/`VAPID_PUBLIC_KEY` reales en `.env` y usar un
+`push_sub` de una Web Push Subscription real generada desde un navegador — queda
+fuera del alcance de esta guía de pruebas rápidas.
 
 **Nota sobre la deduplicación y corridas repetidas**: el registro de
 `id_mensaje` procesados vive en un archivo SQLite persistente
@@ -157,19 +139,23 @@ cero, borrá el archivo:
 rm -f data/processed_messages.db
 ```
 
-### 5. Probar el reencolado / dead-letter (comportamiento nativo de RabbitMQ)
+### 5. Probar el reencolado / límite de reintentos / dead-letter
 
-El worker declara automáticamente, para la cola `notificaciones`, un exchange
-de dead-letter (`notificaciones.dlx`) y una cola `notificaciones.dead-letter`
-(ver `src/consumer/worker.py`, método `run`). Podés inspeccionar ambas en la
-consola de RabbitMQ (http://localhost:15672 → Queues and Streams).
+El worker declara automáticamente, para la cola `notificaciones` (tipo *quorum*),
+un exchange de dead-letter (`notificaciones.dlx`) y una cola
+`notificaciones.dead-letter` (ver `src/consumer/worker.py`, método `run`). Podés
+inspeccionar ambas en la consola de RabbitMQ
+(http://localhost:15672 → Queues and Streams).
 
 - Un mensaje **inválido** (rechazado, `nack(requeue=False)`) termina
   directamente en `notificaciones.dead-letter`.
 - Un mensaje con **fallo transitorio** (ej. push contra un endpoint que no
   existe) se reencola en `notificaciones` (`nack(requeue=True)`) y el worker
-  lo vuelve a intentar — podés verlo reintentarse repetidamente en el log si
-  lo dejás corriendo.
+  lo vuelve a intentar, hasta `RABBITMQ_DELIVERY_LIMIT` veces (default `5`) —
+  al agotar el límite, RabbitMQ lo manda automáticamente a
+  `notificaciones.dead-letter` sin intervención del worker.
+- Un mensaje que queda más de `RABBITMQ_MESSAGE_TTL_MS` (default 24hs) sin
+  poder procesarse también termina en dead-letter.
 
 ### 6. Detener todo
 
