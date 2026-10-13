@@ -33,6 +33,10 @@ class Worker:
             smtp_host=config.smtp_host,
             smtp_port=config.smtp_port,
             smtp_from=config.smtp_from,
+            smtp_user=config.smtp_user,
+            smtp_password=config.smtp_password,
+            smtp_security=config.smtp_security,
+            smtp_timeout_seconds=config.smtp_timeout_seconds,
         )
         self._dedup = RegistroMensajeProcesado(config.sqlite_dedup_path)
 

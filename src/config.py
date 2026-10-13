@@ -30,6 +30,11 @@ class Config:
     vapid_claims_sub: str
     service_api_key: str
     callback_timeout_seconds: int
+    # SMTP autenticado (Gmail: smtp.gmail.com + contraseña de aplicación). Ver services/canales/mail.py.
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_security: str = "none"  # none | starttls | ssl
+    smtp_timeout_seconds: int = 5
 
     @classmethod
     def from_env(cls) -> Config:
@@ -59,4 +64,8 @@ class Config:
             # (ver ReporteInternalController / ServiceApiKeyFilter en ese repo).
             service_api_key=os.environ.get("RECOMMENDATIONS_SERVICE_API_KEY", ""),
             callback_timeout_seconds=_get_int("CALLBACK_TIMEOUT_SECONDS", 5),
+            smtp_user=os.environ.get("SMTP_USER", ""),
+            smtp_password=os.environ.get("SMTP_PASSWORD", ""),
+            smtp_security=os.environ.get("SMTP_SECURITY", "none").strip().lower(),
+            smtp_timeout_seconds=_get_int("SMTP_TIMEOUT_SECONDS", 5),
         )

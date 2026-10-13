@@ -53,3 +53,9 @@ pytest tests/contract      # 🔴 contra RabbitMQ real (se saltean si no está d
 
 Ver `specs/002-worker-notificaciones/quickstart.md` para ejemplos de mensajes,
 detalles de deduplicación, dead-letter exchange y limitaciones conocidas.
+
+## SMTP con autenticación (Gmail)
+
+Variables: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURITY` (`none`|`starttls`|`ssl`), `SMTP_TIMEOUT_SECONDS`.
+Gmail: `smtp.gmail.com`, `587`, `starttls`, usuario = cuenta y contraseña de aplicación de 16 caracteres (se ignoran los espacios).
+Validaciones: usuario sin contraseña o autenticación con `SMTP_SECURITY=none` se rechazan. La contraseña nunca aparece en los logs.
