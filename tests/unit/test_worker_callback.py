@@ -41,12 +41,13 @@ def _mensaje(callback_url: str | None) -> dict:
     return payload
 
 
+def _envio_exitoso(mail, contenido, adjunto=None):
+    return ResultadoEnvio(id_mensaje=0, estado="exitoso", canal="mail")
+
+
 def test_envio_exitoso_con_callback_url_invoca_confirmar_envio(config, monkeypatch):
     worker = Worker(config)
-    monkeypatch.setattr(
-        worker._cliente_mail, "enviar",
-        lambda mail, contenido, adjunto=None: ResultadoEnvio(id_mensaje=0, estado="exitoso", canal="mail"),
-    )
+    monkeypatch.setattr(worker._cliente_mail, "enviar", _envio_exitoso)
     llamadas = []
     monkeypatch.setattr(
         worker_module, "confirmar_envio",
@@ -67,10 +68,7 @@ def test_envio_exitoso_con_callback_url_invoca_confirmar_envio(config, monkeypat
 
 def test_envio_exitoso_sin_callback_url_no_invoca_confirmar_envio(config, monkeypatch):
     worker = Worker(config)
-    monkeypatch.setattr(
-        worker._cliente_mail, "enviar",
-        lambda mail, contenido, adjunto=None: ResultadoEnvio(id_mensaje=0, estado="exitoso", canal="mail"),
-    )
+    monkeypatch.setattr(worker._cliente_mail, "enviar", _envio_exitoso)
     llamadas = []
     monkeypatch.setattr(
         worker_module, "confirmar_envio",
@@ -87,10 +85,7 @@ def test_callback_fallido_no_afecta_el_ack(config, monkeypatch):
     """El mail ya se envió: un callback fallido no debe convertir el ack en nack
     (evita reenviar el mail duplicado por un simple problema de red en el callback)."""
     worker = Worker(config)
-    monkeypatch.setattr(
-        worker._cliente_mail, "enviar",
-        lambda mail, contenido, adjunto=None: ResultadoEnvio(id_mensaje=0, estado="exitoso", canal="mail"),
-    )
+    monkeypatch.setattr(worker._cliente_mail, "enviar", _envio_exitoso)
     monkeypatch.setattr(worker_module, "confirmar_envio", lambda *a, **kw: False)
 
     accion, _ = worker.procesar_mensaje(

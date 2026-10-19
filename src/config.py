@@ -30,7 +30,8 @@ class Config:
     vapid_claims_sub: str
     service_api_key: str
     callback_timeout_seconds: int
-    # SMTP autenticado (Gmail: smtp.gmail.com + contraseña de aplicación). Ver services/canales/mail.py.
+    # SMTP autenticado (Gmail: smtp.gmail.com + contraseña de aplicación).
+    # Ver services/canales/mail.py.
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_security: str = "none"  # none | starttls | ssl

@@ -71,7 +71,9 @@ def _gmail(**extra):
 def test_starttls_con_login_y_envio_en_orden():
     r = _gmail().enviar("dest@ejemplo.com", CONTENIDO)
     assert r.estado == "exitoso"
-    assert FakeSMTP.instancias[0].llamadas == ["ehlo", "starttls", "ehlo", "login:recome@gmail.com", "send"]
+    assert FakeSMTP.instancias[0].llamadas == [
+        "ehlo", "starttls", "ehlo", "login:recome@gmail.com", "send",
+    ]
 
 
 def test_contrasena_de_aplicacion_se_normaliza_sin_espacios(monkeypatch):
@@ -97,7 +99,10 @@ def test_sin_credenciales_ni_tls_no_hace_login_mailpit():
 
 def test_credenciales_sin_tls_se_rechazan_al_construir():
     with pytest.raises(ValueError, match="SMTP_SECURITY"):
-        ClienteMail("smtp.gmail.com", 587, "a@gmail.com", smtp_user="a@gmail.com", smtp_password="x" * 16)
+        ClienteMail(
+            "smtp.gmail.com", 587, "a@gmail.com",
+            smtp_user="a@gmail.com", smtp_password="x" * 16,
+        )
 
 
 def test_security_invalida_se_rechaza():
@@ -111,7 +116,9 @@ def test_usuario_sin_password_se_rechaza():
 
 
 def test_auth_fallida_es_transitoria_y_recuperable_desde_dlq():
-    FakeSMTP.login_error = smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
+    FakeSMTP.login_error = smtplib.SMTPAuthenticationError(
+        535, b"5.7.8 Username and Password not accepted"
+    )
     r = _gmail().enviar("dest@ejemplo.com", CONTENIDO)
     assert r.estado == "fallo_transitorio"  # credencial a corregir: no se pierde el mensaje
     assert "535" in r.detalle
@@ -119,7 +126,9 @@ def test_auth_fallida_es_transitoria_y_recuperable_desde_dlq():
 
 
 def test_destinatario_rechazado_es_definitivo():
-    FakeSMTP.send_error = smtplib.SMTPRecipientsRefused({"x@y.com": (550, b"5.1.1 The email account does not exist")})
+    FakeSMTP.send_error = smtplib.SMTPRecipientsRefused(
+        {"x@y.com": (550, b"5.1.1 The email account does not exist")}
+    )
     r = _gmail().enviar("x@y.com", CONTENIDO)
     assert r.estado == "fallo_definitivo"
 

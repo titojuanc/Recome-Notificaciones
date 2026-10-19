@@ -50,12 +50,15 @@ class ClienteMail:
         smtp_timeout_seconds: float = 5,
     ) -> None:
         if smtp_security not in _SEGURIDADES:
-            raise ValueError(f"SMTP_SECURITY inválido: {smtp_security!r} (usar {', '.join(_SEGURIDADES)})")
+            raise ValueError(
+                f"SMTP_SECURITY inválido: {smtp_security!r} (usar {', '.join(_SEGURIDADES)})"
+            )
         if smtp_user and not smtp_password:
             raise ValueError("SMTP_USER requiere SMTP_PASSWORD")
         if smtp_user and smtp_security == "none":
             raise ValueError(
-                "SMTP_USER sin cifrado: la contraseña viajaría en claro; configurar SMTP_SECURITY=starttls o ssl"
+                "SMTP_USER sin cifrado: la contraseña viajaría en claro; "
+                "configurar SMTP_SECURITY=starttls o ssl"
             )
         self._smtp_host = smtp_host
         self._smtp_port = smtp_port
@@ -101,13 +104,20 @@ class ClienteMail:
         except smtplib.SMTPRecipientsRefused as exc:
             texto = str(exc)
             estado = "fallo_transitorio" if _es_limite_temporal(texto) else "fallo_definitivo"
-            return ResultadoEnvio(id_mensaje=0, estado=estado, canal="mail", detalle=self._sin_secreto(texto))
+            return ResultadoEnvio(
+                id_mensaje=0,
+                estado=estado,
+                canal="mail",
+                detalle=self._sin_secreto(texto),
+            )
         except smtplib.SMTPAuthenticationError as exc:
             return ResultadoEnvio(
                 id_mensaje=0,
                 estado="fallo_transitorio",
                 canal="mail",
-                detalle=self._sin_secreto(f"autenticación SMTP rechazada ({exc.smtp_code}): {exc.smtp_error!r}"),
+                detalle=self._sin_secreto(
+                    f"autenticación SMTP rechazada ({exc.smtp_code}): {exc.smtp_error!r}"
+                ),
             )
         except smtplib.SMTPResponseException as exc:
             texto = f"{exc.smtp_code} {exc.smtp_error!r}"
