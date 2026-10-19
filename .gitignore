@@ -8,3 +8,4 @@ data/
 *.db
 worker.log
 worker.pid
+.env.vapid
