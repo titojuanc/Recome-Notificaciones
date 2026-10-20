@@ -43,6 +43,12 @@ Esto levanta:
 python -m src.consumer.worker
 ```
 
+## Operar el broker de otros equipos
+
+Este equipo opera el RabbitMQ compartido: crea el vhost por entorno, los usuarios y sus
+permisos (RD-120). Ver [docs/BROKER_RABBITMQ.md](docs/BROKER_RABBITMQ.md) y
+`infra/rabbitmq/provision.sh`.
+
 ## Correr los tests
 
 ```bash
