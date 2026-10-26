@@ -43,6 +43,21 @@ Esto levanta:
 python -m src.consumer.worker
 ```
 
+## Migración de la cola `notificaciones` (clásica → quorum)
+
+La cola la declara únicamente este worker. Antes de `dev` se declaraba clásica con solo
+`x-dead-letter-exchange`; ahora es `quorum` con `x-dead-letter-exchange`,
+`x-delivery-limit` y `x-message-ttl`. RabbitMQ rechaza redeclarar una cola con otros
+argumentos (`PRECONDITION_FAILED`), así que en cada entorno donde ya exista hay que
+**borrarla antes de desplegar** (se pierden los mensajes pendientes):
+
+1. Detener los publicadores (api-general, Recos-Auto) y este worker.
+2. Borrar `notificaciones`, `notificaciones.dead-letter` y el exchange `notificaciones.dlx`
+   (UI de management o `rabbitmqadmin delete queue name=notificaciones`, etc.).
+3. Desplegar primero este worker (crea la topología nueva) y luego los publicadores.
+
+Ni api-general ni Recos-Auto declaran esta cola: solo publican.
+
 ## Operar el broker de otros equipos
 
 Este equipo opera el RabbitMQ compartido: crea el vhost por entorno, los usuarios y sus
