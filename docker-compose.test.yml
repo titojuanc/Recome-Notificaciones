@@ -1,0 +1,33 @@
+version: "3.8"
+
+# Infraestructura de testing/desarrollo para el worker de notificaciones.
+# Formaliza en compose lo que se levantó manualmente durante la fase de
+# planificación (ver quickstart.md): RabbitMQ + Mailpit en una red dedicada.
+
+networks:
+  recome-notificaciones-net:
+    name: recome-notificaciones-net
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: recome-rabbitmq
+    networks:
+      - recome-notificaciones-net
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: recome-mailpit
+    networks:
+      - recome-notificaciones-net
+    ports:
+      - "1025:1025"
+      - "8025:8025"
