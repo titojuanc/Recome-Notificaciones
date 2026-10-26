@@ -10,6 +10,7 @@
 # Uso:
 #   RABBIT_VHOST=dev \
 #   NOTIFICACIONES_PASSWORD=... RECOMENDACIONES_PASSWORD=... API_GENERAL_PASSWORD=... \
+#   RECOS_AUTO_PASSWORD=... ARCHIVOS_PASSWORD=... \
 #   ./infra/rabbitmq/provision.sh
 #
 # Variables:
@@ -96,6 +97,32 @@ if [[ -n "${API_GENERAL_PASSWORD:-}" ]]; then
   fi
 else
   echo "api-general: omitido (falta API_GENERAL_PASSWORD)"
+fi
+
+# --- Recome-Recos-Auto (cron + worker) -------------------------------------------
+# Declara y consume `recos-auto.usuarios` (+ `.dlx` y `.dead-letter`, ver
+# src/recos_auto/common/topology.py) y PUBLICA en `notificaciones` por el exchange
+# por defecto (amq.default): NO declara ni consume esa cola. Si cambia
+# RABBITMQ_USERS_QUEUE, ajustar este patrón.
+if [[ -n "${RECOS_AUTO_PASSWORD:-}" ]]; then
+  crear_usuario recos-auto "$RECOS_AUTO_PASSWORD" \
+    '^recos-auto\.usuarios(\..*)?$' \
+    '^(recos-auto\.usuarios(\..*)?|amq\.default)$' \
+    '^recos-auto\.usuarios(\..*)?$'
+else
+  echo "recos-auto: omitido (falta RECOS_AUTO_PASSWORD)"
+fi
+
+# --- Recome-Archivos (worker de reportes) ----------------------------------------
+# Declara y consume `reporte.generar`, declara `reporte.listo` y publica en ella por
+# el exchange por defecto (src/worker/main.py, events/publisher.py).
+if [[ -n "${ARCHIVOS_PASSWORD:-}" ]]; then
+  crear_usuario archivos-worker "$ARCHIVOS_PASSWORD" \
+    '^reporte\.(generar|listo)$' \
+    '^amq\.default$' \
+    '^reporte\.(generar|listo)$'
+else
+  echo "archivos-worker: omitido (falta ARCHIVOS_PASSWORD)"
 fi
 
 # Un usuario `guest` solo sirve en localhost; no se le da acceso al vhost nuevo.

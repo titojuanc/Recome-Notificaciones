@@ -18,6 +18,7 @@ Qué hace y qué NO hace este equipo:
 RABBIT_VHOST=dev \
 RABBITMQCTL="docker exec recome-rabbitmq rabbitmqctl" \
 NOTIFICACIONES_PASSWORD=... RECOMENDACIONES_PASSWORD=... API_GENERAL_PASSWORD=... \
+RECOS_AUTO_PASSWORD=... ARCHIVOS_PASSWORD=... \
 ./infra/rabbitmq/provision.sh
 ```
 
@@ -34,6 +35,8 @@ NOTIFICACIONES_PASSWORD=... RECOMENDACIONES_PASSWORD=... API_GENERAL_PASSWORD=..
 | `notificaciones-worker` | `^notificaciones(\..*)?$` | `^notificaciones(\..*)?$` | `^notificaciones(\..*)?$` |
 | `recomendaciones-worker` | `^(recomendacion\.actualizar\.v3\|usuario\.eliminado\|recomendaciones\..*)$` | `^(recomendaciones\..*\|amq\.default)$` | igual que configure |
 | `api-general` (`main`) | `^$` | `^(recomendacion\.actualizar\.v3\|usuario\.eliminado)$` | `^$` |
+| `recos-auto` | `^recos-auto\.usuarios(\..*)?$` | `^(recos-auto\.usuarios(\..*)?\|amq\.default)$` | `^recos-auto\.usuarios(\..*)?$` |
+| `archivos-worker` | `^reporte\.(generar\|listo)$` | `^amq\.default$` | `^reporte\.(generar\|listo)$` |
 
 Notas:
 
@@ -44,8 +47,15 @@ Notas:
   rama `notis`, aún sin fusionar. Con `API_GENERAL_INCLUDE_REPORTES=1` el script los agrega.
 - El exchange v2 `recomendacion.actualizar` **no se crea** ni se permite: está apagado
   (`RECOMMENDATIONS_OUTBOX_V2_ENABLED=false`) y no tiene consumidor.
-- **`Recome-Archivos` no está en la tabla**: su worker consume `reporte.generar` y publica
-  `reporte.listo`, pero RD-120 no define su usuario. Pendiente de confirmar (ver abajo).
+- `recos-auto` y `archivos-worker` **no estaban en la tabla original de RD-120**; los definió
+  notificaciones según lo que hace cada servicio en el broker (ver el script). Ambos publican
+  por `amq.default`, que permite publicar en **cualquier** cola por nombre: los permisos de
+  *write* no pueden restringirlo a `notificaciones` o `reporte.listo`. Es una limitación de
+  RabbitMQ con el exchange por defecto, no del script.
+- `Recome-Recos-Auto` solo **publica** en `notificaciones`: no la declara ni la lee.
+- Con `API_GENERAL_INCLUDE_REPORTES=1`, `api-general` declara `reporte.*` y publica
+  `reporte.generar` y `notificaciones` por `amq.default`. **Sin ese flag, no puede publicar
+  reportes** (`ACCESS_REFUSED`): hay que correr el script con él cuando se fusione el módulo.
 
 ## Topología propia de notificaciones
 
@@ -65,6 +75,9 @@ y con una conexión por cada usuario, comprobando lo permitido y lo denegado:
 - `api-general` publica en v3 (con `mandatory` y confirmación) y no puede declarar exchanges
   ni publicar en el v2.
 - `guest` no accede al vhost.
+- `recos-auto` declara su topología con `declarar_topologia` de Recos-Auto, hace el *passive declare* del worker, consume y publica en `notificaciones` con `mandatory` y confirmación; no puede declarar ni leer `notificaciones` ni colas ajenas.
+- `archivos-worker` declara/consume/publica `reporte.*`; no puede declarar ni leer `notificaciones`.
+- `api-general` (con reportes) declara `reporte.*` y publica en `notificaciones`; no puede declararla ni leerla.
 
 No prueba la topología desplegada en Dokploy: eso se verifica con la prueba de humo de
 `migracion-v3.md` (repo de recomendaciones).
@@ -78,6 +91,6 @@ No prueba la topología desplegada en Dokploy: eso se verifica con la prueba de 
 
 ## Pendientes con otros equipos
 
-- Permisos del usuario de `Recome-Archivos` (`reporte.*`).
+- Que los equipos de `Recome-Archivos` y `Recome-Recos-Auto` confirmen que usan los usuarios `archivos-worker` y `recos-auto` (hoy no sabemos con qué usuario se conectan en Dokploy).
 - Cuál de los dos conjuntos de permisos de `api-general` aplica, y cuándo se fusiona `notis`.
 - Evidencia primaria de la aprobación (firmante y canal) para cerrar T006 en `api-general`.
