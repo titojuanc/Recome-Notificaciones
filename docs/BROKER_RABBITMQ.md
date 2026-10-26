@@ -42,9 +42,10 @@ Notas:
 
 - `recomendaciones-worker` necesita `amq.default` porque manda reintentos y DLQ por el
   exchange por defecto (RD-120).
-- `api-general` en su `main` **solo publica** (`OutboxPublisher`): no declara ni consume.
-  Los permisos `reporte.*` y `amq.default` de la tabla original de RD-120 corresponden a su
-  rama `notis`, aún sin fusionar. Con `API_GENERAL_INCLUDE_REPORTES=1` el script los agrega.
+- `api-general` publica los eventos de recomendaciones (`OutboxPublisher`) y, desde que fusionó
+  el módulo de reportes a su `main` (26-oct-2026), también declara/consume `reporte.*` y publica
+  `reporte.generar` y `notificaciones` por `amq.default`. El script le da esos permisos **por
+  defecto** (`API_GENERAL_INCLUDE_REPORTES=1`); con `=0` queda solo con los de eventos.
 - El exchange v2 `recomendacion.actualizar` **no se crea** ni se permite: está apagado
   (`RECOMMENDATIONS_OUTBOX_V2_ENABLED=false`) y no tiene consumidor.
 - `recos-auto` y `archivos-worker` **no estaban en la tabla original de RD-120**; los definió
@@ -53,9 +54,8 @@ Notas:
   *write* no pueden restringirlo a `notificaciones` o `reporte.listo`. Es una limitación de
   RabbitMQ con el exchange por defecto, no del script.
 - `Recome-Recos-Auto` solo **publica** en `notificaciones`: no la declara ni la lee.
-- Con `API_GENERAL_INCLUDE_REPORTES=1`, `api-general` declara `reporte.*` y publica
-  `reporte.generar` y `notificaciones` por `amq.default`. **Sin ese flag, no puede publicar
-  reportes** (`ACCESS_REFUSED`): hay que correr el script con él cuando se fusione el módulo.
+- Sin los permisos de `reporte.*`, `api-general` no puede declarar ni publicar reportes
+  (`ACCESS_REFUSED`): no usar `API_GENERAL_INCLUDE_REPORTES=0` en un entorno con reportes.
 
 ## Topología propia de notificaciones
 
@@ -92,5 +92,5 @@ No prueba la topología desplegada en Dokploy: eso se verifica con la prueba de 
 ## Pendientes con otros equipos
 
 - Que los equipos de `Recome-Archivos` y `Recome-Recos-Auto` confirmen que usan los usuarios `archivos-worker` y `recos-auto` (hoy no sabemos con qué usuario se conectan en Dokploy).
-- Cuál de los dos conjuntos de permisos de `api-general` aplica, y cuándo se fusiona `notis`.
+- Que api-general nos pase el host/vhost/usuario con los que configurará `SPRING_RABBITMQ_*` (hoy su compose de Dokploy no configura RabbitMQ).
 - Evidencia primaria de la aprobación (firmante y canal) para cerrar T006 en `api-general`.

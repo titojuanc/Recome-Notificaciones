@@ -18,9 +18,11 @@
 #   RABBITMQCTL               comando a usar. Default: "rabbitmqctl".
 #                             Con Docker: RABBITMQCTL="docker exec recome-rabbitmq rabbitmqctl"
 #   *_PASSWORD                contraseña de cada usuario. Si falta, se omite ese usuario.
-#   API_GENERAL_INCLUDE_REPORTES=1
-#                             agrega los permisos reporte.* de api-general (rama `notis`,
-#                             aún sin fusionar en main). Por defecto NO se otorgan.
+#   API_GENERAL_INCLUDE_REPORTES   (default 1)
+#                             agrega los permisos reporte.* de api-general. El módulo de
+#                             reportes ya está en su `main` (26-oct-2026) y sin estos
+#                             permisos no puede declarar ni publicar (ACCESS_REFUSED).
+#                             Poner 0 solo para un entorno sin reportes.
 #
 # Las contraseñas NUNCA se guardan en el repositorio: se pasan por entorno.
 set -euo pipefail
@@ -82,11 +84,11 @@ else
 fi
 
 # --- api-general (RD-120, ratificación 2026-10-08) ----------------------------
-# En su `main` solo PUBLICA en los dos exchanges; no declara ni consume nada.
+# Eventos de recomendaciones: solo PUBLICA en los dos exchanges.
+# Reportes (en su `main` desde el 26-oct-2026): además declara/consume reporte.* y
+# publica reporte.generar y notificaciones por el exchange por defecto.
 if [[ -n "${API_GENERAL_PASSWORD:-}" ]]; then
-  if [[ "${API_GENERAL_INCLUDE_REPORTES:-0}" == "1" ]]; then
-    # Rama `notis` (sin fusionar): además declara/consume reporte.* y publica
-    # reporte.generar por el exchange por defecto.
+  if [[ "${API_GENERAL_INCLUDE_REPORTES:-1}" == "1" ]]; then
     crear_usuario api-general "$API_GENERAL_PASSWORD" \
       '^reporte\.(generar|listo)$' \
       '^(recomendacion\.actualizar\.v3|usuario\.eliminado|amq\.default)$' \
