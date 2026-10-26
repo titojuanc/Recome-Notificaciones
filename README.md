@@ -51,10 +51,15 @@ La cola la declara únicamente este worker. Antes de `dev` se declaraba clásica
 argumentos (`PRECONDITION_FAILED`), así que en cada entorno donde ya exista hay que
 **borrarla antes de desplegar** (se pierden los mensajes pendientes):
 
+0. **Verificar antes de borrar nada** (en el vhost que usa `RABBITMQ_URL`):
+   `rabbitmqctl list_queues -p <vhost> name type arguments`. Si `notificaciones` ya es
+   `quorum` con `x-delivery-limit` y `x-message-ttl`, no hay nada que migrar.
 1. Detener los publicadores (api-general, Recos-Auto) y este worker.
-2. Borrar `notificaciones`, `notificaciones.dead-letter` y el exchange `notificaciones.dlx`
-   (UI de management o `rabbitmqadmin delete queue name=notificaciones`, etc.).
-3. Desplegar primero este worker (crea la topología nueva) y luego los publicadores.
+2. Borrar **solo** la cola `notificaciones`
+   (`rabbitmqctl delete_queue -p <vhost> notificaciones`). `notificaciones.dead-letter` y el
+   exchange `notificaciones.dlx` se declaran igual en las dos versiones: no se tocan, y
+   la dead-letter puede tener mensajes que conviene revisar antes de descartarlos.
+3. Desplegar primero este worker (crea la cola nueva) y luego los publicadores.
 
 Ni api-general ni Recos-Auto declaran esta cola: solo publican.
 
