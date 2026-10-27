@@ -33,7 +33,7 @@
         "null"
       ],
       "format": "email",
-      "description": "Dirección de correo ya resuelta por el emisor. Obligatoria si y solo si canal = 'mail'; debe estar ausente/null si canal = 'push'."
+      "description": "Dirección de correo ya resuelta por el emisor. Obligatoria si canal = 'mail'. Con canal = 'push' es opcional: si la suscripción push ya no existe (404/410), el aviso se envía por mail."
     },
     "push_sub": {
       "description": "Web Push Subscription ya resuelta por el emisor. Obligatoria si y solo si canal = 'push'; debe estar ausente/null si canal = 'mail'.",
@@ -90,6 +90,13 @@
         "cuerpo": {
           "type": "string",
           "minLength": 1
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Destino opcional al tocar la notificación push (el service worker solo abre páginas del propio sitio). En mail se ignora."
         }
       },
       "description": "Contenido ya resuelto de la notificación. El mecanismo de plantillas queda fuera de alcance (decisión de diseño pendiente)."
@@ -165,11 +172,7 @@
         "required": [
           "push_sub"
         ],
-        "properties": {
-          "mail": {
-            "type": "null"
-          }
-        }
+        "properties": {}
       }
     }
   ]

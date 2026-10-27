@@ -28,6 +28,9 @@ class Contenido(BaseModel):
 
     titulo: str
     cuerpo: str
+    url: str | None = None
+    """Destino opcional al tocar la notificación push (el service worker solo abre
+    páginas del propio sitio). En mail se ignora: el link va dentro del cuerpo."""
 
 
 class Adjunto(BaseModel):
@@ -76,6 +79,5 @@ class MensajeNotificacion(BaseModel):
         elif self.canal == "push":
             if self.push_sub is None:
                 raise ValueError("canal 'push' requiere el campo 'push_sub' presente")
-            if self.mail is not None:
-                raise ValueError("canal 'push' no debe traer 'mail'")
+            # `mail` es opcional: respaldo si la suscripción push ya no existe (404/410).
         return self

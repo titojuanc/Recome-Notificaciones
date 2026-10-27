@@ -105,11 +105,26 @@ def test_rechaza_push_sin_push_sub():
         MensajeNotificacion.model_validate(payload)
 
 
-def test_rechaza_push_con_mail_presente():
+def test_acepta_push_con_mail_de_respaldo():
     payload = dict(MENSAJE_PUSH_VALIDO)
     payload["mail"] = "usuario@ejemplo.com"
+    msg = MensajeNotificacion.model_validate(payload)
+    assert msg.canal == "push"
+    assert msg.mail == "usuario@ejemplo.com"
+
+
+def test_rechaza_push_con_mail_de_respaldo_invalido():
+    payload = dict(MENSAJE_PUSH_VALIDO)
+    payload["mail"] = "no-es-un-mail"
     with pytest.raises(ValidationError):
         MensajeNotificacion.model_validate(payload)
+
+
+def test_contenido_url_es_opcional():
+    assert MensajeNotificacion.model_validate(MENSAJE_PUSH_VALIDO).contenido.url is None
+    payload = dict(MENSAJE_PUSH_VALIDO)
+    payload["contenido"] = {"titulo": "t", "cuerpo": "c", "url": "https://recome.example/catalogo/1"}
+    assert MensajeNotificacion.model_validate(payload).contenido.url == "https://recome.example/catalogo/1"
 
 
 # --- T022c: formato de mail inválido (FR-015) ---

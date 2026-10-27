@@ -14,4 +14,6 @@ class ResultadoEnvio(BaseModel):
     estado: Literal["exitoso", "fallo_transitorio", "fallo_definitivo"]
     canal: Literal["push", "mail"]
     detalle: str | None = None
+    suscripcion_caducada: bool = False
+    """Solo push: el servicio push respondió 404/410 (suscripción dada de baja o vencida)."""
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
