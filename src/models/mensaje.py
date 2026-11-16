@@ -58,8 +58,8 @@ class MensajeNotificacion(BaseModel):
     id_mensaje: int
     canal: Literal["push", "mail"]
     destinatario: int | None
-    """Id del usuario, solo para trazabilidad. Obligatorio pero puede ser null: el mail con el código de
-    verificación se manda antes de que exista la cuenta."""
+    """Id del usuario, solo para trazabilidad. Obligatorio pero puede ser null: el mail con el
+    código de verificación se manda antes de que exista la cuenta."""
     mail: EmailStr | None = None
     push_sub: PushSubscription | None = None
     contenido: Contenido
