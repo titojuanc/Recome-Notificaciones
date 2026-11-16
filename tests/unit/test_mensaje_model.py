@@ -51,6 +51,19 @@ def test_mensaje_push_valido():
     assert msg.mail is None
 
 
+def test_mail_sin_cuenta_acepta_destinatario_nulo():
+    """El código de verificación del alta se manda antes de que exista el usuario."""
+    msg = MensajeNotificacion.model_validate({**MENSAJE_MAIL_VALIDO, "destinatario": None})
+    assert msg.destinatario is None
+
+
+def test_destinatario_sigue_siendo_obligatorio():
+    payload = dict(MENSAJE_MAIL_VALIDO)
+    del payload["destinatario"]
+    with pytest.raises(ValidationError):
+        MensajeNotificacion.model_validate(payload)
+
+
 # --- T020: falta canal ---
 
 
