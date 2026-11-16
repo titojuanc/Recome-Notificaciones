@@ -14,7 +14,7 @@ Representa el payload recibido desde la cola de RabbitMQ. Corresponde a la entid
 |-------|------|-------------|-------------|
 | `id_mensaje` | `int` | Sí | Identificador único numérico del mensaje; usado para deduplicación (FR-011). |
 | `canal` | `Literal["push", "mail"]` | Sí | Canal de envío. Cualquier otro valor es inválido (FR-005). |
-| `destinatario` | `int` | Sí | Id numérico del usuario. Usado solo para trazabilidad/logging — no es el dato de contacto real usado para enviar. |
+| `destinatario` | `int \| null` | Sí | Id numérico del usuario. Usado solo para trazabilidad/logging — no es el dato de contacto real usado para enviar. Es `null` en mails a quien todavía no tiene cuenta (código de verificación del alta en api-general). |
 | `mail` | `EmailStr \| None` (pydantic `email-validator`) | Condicional | Dirección de correo ya resuelta por el emisor. Obligatoria si y solo si `canal = "mail"`; debe estar ausente/`None` si `canal = "push"` (FR-013). Formato inválido → rechazo (FR-015). |
 | `push_sub` | `PushSubscription \| None` | Condicional | Web Push Subscription ya resuelta por el emisor. Obligatorio si y solo si `canal = "push"`; debe estar ausente/`None` si `canal = "mail"` (FR-013). |
 | `contenido` | `Contenido` (modelo anidado) | Sí | Datos necesarios para armar la notificación. Estructura exacta pendiente del contrato externo (Principio III); en esta iteración se valida como mínimo `titulo: str` y `cuerpo: str`. |

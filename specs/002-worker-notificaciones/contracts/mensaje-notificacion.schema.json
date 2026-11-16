@@ -24,8 +24,11 @@
       "description": "Canal de envío indicado por el emisor del mensaje."
     },
     "destinatario": {
-      "type": "integer",
-      "description": "Id numérico del usuario, usado solo para trazabilidad/logging. No es el dato de contacto real usado para enviar."
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Id numérico del usuario, usado solo para trazabilidad/logging. No es el dato de contacto real usado para enviar. Es null en mails a quien todavía no tiene cuenta (código de verificación del alta)."
     },
     "mail": {
       "type": [
