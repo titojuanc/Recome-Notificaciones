@@ -29,11 +29,15 @@ def test_html_escapa_el_contenido_y_separa_parrafos():
     assert "<b>" not in html
 
 
-def test_destacado_aparece_resaltado_en_html_y_en_texto():
-    contenido = Contenido(titulo="Código", cuerpo="Usalo ya.", destacado="123456")
-    assert "letter-spacing:8px" in html_mail(contenido)
-    assert ">123456</span>" in html_mail(contenido)
-    assert texto_plano(contenido).startswith("Usalo ya.\n\n123456\n\n")
+def test_destacado_va_resaltado_despues_del_primer_parrafo():
+    contenido = Contenido(titulo="Código", cuerpo="Usalo ya.\n\nSi no fuiste vos, ignoralo.",
+                          destacado="123456")
+    html = html_mail(contenido)
+    assert "letter-spacing:8px" in html
+    assert html.index("Usalo ya.") < html.index(">123456</span>") < html.index("ignoralo")
+    assert texto_plano(contenido) == (
+        "Usalo ya.\n\n123456\n\nSi no fuiste vos, ignoralo.\n\n— RecoMe\n"
+    )
 
 
 def test_sin_destacado_no_hay_caja():

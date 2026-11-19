@@ -42,31 +42,34 @@ _PIE = (
 _NOTA_PIE = "Este mail lo mandó RecoMe automáticamente; no hace falta responderlo."
 
 
-def _parrafos(texto: str) -> str:
-    """Párrafos separados por línea en blanco; los saltos simples quedan como <br>."""
-    bloques = [b.strip() for b in texto.replace("\r\n", "\n").split("\n\n") if b.strip()]
-    return "".join(
-        f'<p style="{_P}">{html.escape(b).replace(chr(10), "<br>")}</p>' for b in bloques
-    )
+def _bloques(contenido: Contenido) -> list[str]:
+    """Párrafos del cuerpo (separados por línea en blanco) con el destacado, si hay,
+    ubicado después del primero: el dato queda junto a la frase que lo presenta."""
+    cuerpo = contenido.cuerpo.replace("\r\n", "\n").split("\n\n")
+    bloques = [b.strip() for b in cuerpo if b.strip()]
+    if contenido.destacado:
+        bloques.insert(min(1, len(bloques)), None)
+    return bloques
 
 
 def texto_plano(contenido: Contenido) -> str:
     """Versión de texto del mail (clientes sin HTML y filtros de spam)."""
-    partes = [contenido.cuerpo.strip()]
-    if contenido.destacado:
-        partes.append(contenido.destacado)
-    partes.append("— RecoMe")
-    return "\n\n".join(partes) + "\n"
+    partes = [contenido.destacado if b is None else b for b in _bloques(contenido)]
+    return "\n\n".join([*partes, "— RecoMe"]) + "\n"
+
+
+def _html_bloque(bloque: str | None, destacado: str | None) -> str:
+    if bloque is None:
+        return (
+            '<p style="margin:8px 0 24px;text-align:center;">'
+            f'<span style="{_CAJA}">{html.escape(destacado)}</span></p>'
+        )
+    return f'<p style="{_P}">{html.escape(bloque).replace(chr(10), "<br>")}</p>'
 
 
 def html_mail(contenido: Contenido) -> str:
     titulo = html.escape(contenido.titulo)
-    destacado = ""
-    if contenido.destacado:
-        destacado = (
-            '<p style="margin:8px 0 24px;text-align:center;">'
-            f'<span style="{_CAJA}">{html.escape(contenido.destacado)}</span></p>'
-        )
+    cuerpo = "".join(_html_bloque(b, contenido.destacado) for b in _bloques(contenido))
     return "\n".join([
         "<!DOCTYPE html>",
         '<html lang="es">',
@@ -82,7 +85,7 @@ def html_mail(contenido: Contenido) -> str:
         "</td></tr>",
         '<tr><td style="padding:28px 28px 12px;">',
         f'<h1 style="{_H1}">{titulo}</h1>',
-        _parrafos(contenido.cuerpo) + destacado,
+        cuerpo,
         "</td></tr>",
         f'<tr><td style="{_PIE}">{_NOTA_PIE}</td></tr>',
         "</table>",
