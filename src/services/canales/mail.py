@@ -28,6 +28,7 @@ from email.message import EmailMessage
 
 from src.models.mensaje import Adjunto, Contenido
 from src.models.resultado import ResultadoEnvio
+from src.services.canales.plantilla_mail import html_mail, texto_plano
 
 _SEGURIDADES = ("none", "starttls", "ssl")
 _LIMITES_TEMPORALES = ("5.4.5", "daily user sending limit", "rate limit", "too many")
@@ -81,7 +82,8 @@ class ClienteMail:
         msg["From"] = self._smtp_from
         msg["To"] = mail
         msg["Subject"] = contenido.titulo
-        msg.set_content(contenido.cuerpo)
+        msg.set_content(texto_plano(contenido))
+        msg.add_alternative(html_mail(contenido), subtype="html")
 
         if adjunto is not None:
             maintype, _, subtype = adjunto.content_type.partition("/")

@@ -31,6 +31,9 @@ class Contenido(BaseModel):
     url: str | None = None
     """Destino opcional al tocar la notificación push (el service worker solo abre
     páginas del propio sitio). En mail se ignora: el link va dentro del cuerpo."""
+    destacado: str | None = None
+    """Dato que el mail muestra resaltado debajo del cuerpo (p. ej. un código de verificación).
+    En push se ignora."""
 
 
 class Adjunto(BaseModel):
