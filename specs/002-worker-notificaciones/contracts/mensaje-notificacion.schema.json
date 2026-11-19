@@ -100,6 +100,13 @@
             "null"
           ],
           "description": "Destino opcional al tocar la notificación push (el service worker solo abre páginas del propio sitio). En mail se ignora."
+        },
+        "destacado": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Dato opcional que el mail muestra resaltado debajo del cuerpo (p. ej. un código de verificación). En push se ignora."
         }
       },
       "description": "Contenido ya resuelto de la notificación. El mecanismo de plantillas queda fuera de alcance (decisión de diseño pendiente)."
