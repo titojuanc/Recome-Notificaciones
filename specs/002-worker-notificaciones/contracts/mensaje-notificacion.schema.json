@@ -148,6 +148,20 @@
         "null"
       ],
       "description": "URL interna opcional para confirmar el envío (callback de feedback)."
+    },
+    "tipo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "recomendacion_dia",
+        "pelicula_nueva",
+        "descuento_juego",
+        "anuncio",
+        null
+      ],
+      "description": "Tipo de notificación para las analytics del admin (spec 013 de api-general). Opcional: sin tipo (códigos de verificación, reportes) el envío no se mide. Con tipo, el worker avisa a api-general cada envío exitoso; el emisor debe poner ?n=<tipo> en contenido.url para que se mida el clic."
     }
   },
   "allOf": [

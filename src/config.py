@@ -36,6 +36,9 @@ class Config:
     smtp_password: str = ""
     smtp_security: str = "none"  # none | starttls | ssl
     smtp_timeout_seconds: int = 5
+    # Base de api-general (ej. http://api-general:8080/api/v1) para avisar cada envío exitoso de un
+    # mensaje con `tipo` (analytics del admin, spec 013). Vacío = no se reporta nada.
+    api_general_base_url: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -69,4 +72,5 @@ class Config:
             smtp_password=os.environ.get("SMTP_PASSWORD", ""),
             smtp_security=os.environ.get("SMTP_SECURITY", "none").strip().lower(),
             smtp_timeout_seconds=_get_int("SMTP_TIMEOUT_SECONDS", 5),
+            api_general_base_url=os.environ.get("API_GENERAL_BASE_URL", "").strip().rstrip("/"),
         )

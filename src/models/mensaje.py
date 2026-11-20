@@ -9,6 +9,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
 
 
+TipoNotificacion = Literal["recomendacion_dia", "pelicula_nueva", "descuento_juego", "anuncio"]
+
+
 class PushKeys(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -68,6 +71,9 @@ class MensajeNotificacion(BaseModel):
     contenido: Contenido
     adjunto: Adjunto | None = None
     """Adjunto opcional para el canal 'mail' (ver clase Adjunto)."""
+    tipo: TipoNotificacion | None = None
+    """Tipo para las analytics del admin (spec 013 de api-general). Opcional: sin tipo el
+    envío no se mide. El emisor debe poner `?n=<tipo>` en `contenido.url` para medir el clic."""
     callback_url: str | None = None
     """URL interna (api-general) a la que se hace POST tras enviar el mail
     con éxito, para cerrar el loop de feedback (US: reporte de anuncio).
