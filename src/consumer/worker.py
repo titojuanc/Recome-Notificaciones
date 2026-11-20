@@ -107,7 +107,8 @@ class Worker:
     def _reportar_envio(self, mensaje: MensajeNotificacion, canal: str) -> None:
         """Avisa a api-general (analytics, spec 013) un envío exitoso de un mensaje con `tipo`.
 
-        Como el callback, nunca afecta el ack: el envío ya ocurrió y reintentarlo duplicaría el aviso al usuario.
+        Como el callback, nunca afecta el ack: el envío ya ocurrió y reintentarlo
+        duplicaría el aviso al usuario.
         `canal` es el que se usó de verdad (puede ser mail si el push cayó al respaldo).
         """
         if not mensaje.tipo or not self._config.api_general_base_url:

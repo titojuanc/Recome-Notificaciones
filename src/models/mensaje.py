@@ -8,7 +8,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
 
-
 TipoNotificacion = Literal["recomendacion_dia", "pelicula_nueva", "descuento_juego", "anuncio"]
 
 

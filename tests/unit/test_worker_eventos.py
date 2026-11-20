@@ -1,4 +1,6 @@
-"""Unit tests: el worker avisa a api-general cada envío exitoso de un mensaje con `tipo` (spec 013 de api-general).
+"""Unit tests: el worker avisa a api-general cada envío exitoso de un mensaje con `tipo`.
+
+(Spec 013 de api-general.)
 
 Se prueba `procesar_mensaje` (sin RabbitMQ) y el cliente HTTP contra un servidor local efímero.
 """
@@ -49,7 +51,9 @@ def _exitoso(canal: str = "mail"):
 
 
 def _fallido(*a, **kw):
-    return ResultadoEnvio(id_mensaje=0, estado="fallo_definitivo", canal="mail", detalle="rechazado")
+    return ResultadoEnvio(
+        id_mensaje=0, estado="fallo_definitivo", canal="mail", detalle="rechazado"
+    )
 
 
 def _espiar(monkeypatch, retorno=True):
@@ -151,7 +155,7 @@ def test_tipo_desconocido_se_rechaza_como_mensaje_invalido():
         MensajeNotificacion.model_validate(_mensaje(tipo="codigo_de_verificacion"))
 
 
-# --- Cliente HTTP -------------------------------------------------------------------------------------------------
+# --- Cliente HTTP ----------------------------------------------------------------------
 
 
 class _Receptor(BaseHTTPRequestHandler):
@@ -185,7 +189,8 @@ def servidor():
 
 
 def test_el_cliente_manda_json_con_la_clave_en_el_header_correcto(servidor):
-    assert reportar_envio(servidor, "test.secreto", 2, tipo="anuncio", canal="push", id_mensaje=5) is True
+    ok = reportar_envio(servidor, "test.secreto", 2, tipo="anuncio", canal="push", id_mensaje=5)
+    assert ok is True
 
     [recibido] = _Receptor.recibidos
     assert recibido["path"] == "/api/v1/internal/v1/notification-events"
@@ -200,11 +205,21 @@ def test_el_cliente_devuelve_false_ante_un_error_http(servidor):
 
 
 def test_el_cliente_devuelve_false_si_api_general_no_responde():
-    assert reportar_envio("http://127.0.0.1:1/api/v1", "k", 1, tipo="anuncio", canal="mail", id_mensaje=1) is False
+    ok = reportar_envio(
+        "http://127.0.0.1:1/api/v1", "k", 1, tipo="anuncio", canal="mail", id_mensaje=1
+    )
+    assert ok is False
 
 
 def test_el_cliente_no_loguea_la_clave(servidor, caplog):
     _Receptor.status = 500
     with caplog.at_level("WARNING"):
-        reportar_envio(servidor, "test.secreto-que-no-debe-salir", 2, tipo="anuncio", canal="mail", id_mensaje=1)
+        reportar_envio(
+            servidor,
+            "test.secreto-que-no-debe-salir",
+            2,
+            tipo="anuncio",
+            canal="mail",
+            id_mensaje=1,
+        )
     assert "secreto-que-no-debe-salir" not in caplog.text
