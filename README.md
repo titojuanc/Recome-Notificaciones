@@ -85,3 +85,12 @@ detalles de deduplicación, dead-letter exchange y limitaciones conocidas.
 Variables: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURITY` (`none`|`starttls`|`ssl`), `SMTP_TIMEOUT_SECONDS`.
 Gmail: `smtp.gmail.com`, `587`, `starttls`, usuario = cuenta y contraseña de aplicación de 16 caracteres (se ignoran los espacios).
 Validaciones: usuario sin contraseña o autenticación con `SMTP_SECURITY=none` se rechazan. La contraseña nunca aparece en los logs.
+
+## Analytics del admin: envíos medidos
+
+Si el mensaje trae `tipo` (`recomendacion_dia`, `pelicula_nueva`, `descuento_juego` o `anuncio`) y
+`API_GENERAL_BASE_URL` está configurada, el worker avisa a api-general cada envío exitoso
+(`POST /internal/v1/notification-events`, con `X-Internal-API-Key`, idempotente por `id_mensaje`). Con eso el panel
+calcula el CTR. El aviso nunca cambia el ack del mensaje: si falla, solo queda un `evento_fallido` en el log.
+Los mensajes sin `tipo` (códigos, reportes) no se miden. Para medir también el clic, el emisor tiene que poner
+`?n=<tipo>` en `contenido.url`. Contrato en `recome-api-general/specs/013-analytics-admin/`.

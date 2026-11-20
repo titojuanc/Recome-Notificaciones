@@ -19,6 +19,7 @@ from src.services.canales.mail import ClienteMail
 from src.services.canales.push import ClientePush
 from src.services.dedup import RegistroMensajeProcesado
 from src.services.enrutador import enrutar
+from src.services.eventos import reportar_envio
 
 
 class Worker:
@@ -81,6 +82,7 @@ class Worker:
                     id_mensaje=mensaje.id_mensaje,
                     canal=mensaje.canal,
                 )
+            self._reportar_envio(mensaje, resultado.canal)
             return "ack", mensaje
 
         if resultado.estado == "fallo_transitorio":
@@ -101,6 +103,31 @@ class Worker:
             detalle=resultado.detalle,
         )
         return "nack_sin_requeue", mensaje
+
+    def _reportar_envio(self, mensaje: MensajeNotificacion, canal: str) -> None:
+        """Avisa a api-general (analytics, spec 013) un envío exitoso de un mensaje con `tipo`.
+
+        Como el callback, nunca afecta el ack: el envío ya ocurrió y reintentarlo
+        duplicaría el aviso al usuario.
+        `canal` es el que se usó de verdad (puede ser mail si el push cayó al respaldo).
+        """
+        if not mensaje.tipo or not self._config.api_general_base_url:
+            return
+        exito = reportar_envio(
+            self._config.api_general_base_url,
+            self._config.service_api_key,
+            self._config.callback_timeout_seconds,
+            tipo=mensaje.tipo,
+            canal=canal,
+            id_mensaje=mensaje.id_mensaje,
+            logger=self._logger,
+        )
+        log_evento(
+            self._logger,
+            "evento_reportado" if exito else "evento_fallido",
+            id_mensaje=mensaje.id_mensaje,
+            canal=canal,
+        )
 
     def _on_message(self, channel, method_frame, header_frame, body) -> None:
         accion, _ = self.procesar_mensaje(body)
